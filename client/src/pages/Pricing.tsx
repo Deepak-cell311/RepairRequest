@@ -76,8 +76,9 @@ export default function Pricing() {
                 <CardTitle className="text-2xl">Starter</CardTitle>
                 <CardDescription>Perfect for small organizations</CardDescription>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold">$199</span>
-                  <span className="text-gray-600">/month</span>
+                  <span className="text-2xl font-bold">$2500</span>
+                  <span className="text-2xl font-bold"> – $3500</span>
+                  <span className="text-gray-600">/year</span>
                 </div>
               </CardHeader>
               <CardContent>
@@ -125,8 +126,9 @@ export default function Pricing() {
                 <CardTitle className="text-2xl">Professional</CardTitle>
                 <CardDescription>Ideal for growing organizations</CardDescription>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold">$399</span>
-                  <span className="text-gray-600">/month</span>
+                  <span className="text-2xl font-bold">$4500</span>
+                  <span className="text-2xl font-bold"> – $5500</span>
+                  <span className="text-gray-600">/year</span>
                 </div>
               </CardHeader>
               <CardContent>
