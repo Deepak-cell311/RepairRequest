@@ -79,7 +79,7 @@ export default function RequestForm() {
         description: "Your labor request has been submitted successfully.",
       });
       
-      navigate("/");
+      navigate("/dashboard");
     } catch (error) {
       console.error("Error submitting request:", error);
       toast({

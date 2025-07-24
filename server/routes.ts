@@ -2588,12 +2588,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "User with this email already exists" });
       }
 
+      // Always use default password
+      const tempPassword = 'Password123!';
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
       // Create user data
       const userData = {
         id: crypto.randomUUID(),
         email,
         firstName,
         lastName,
+        password: hashedPassword, // always default
         role,
         organizationId: role === 'super_admin' ? null : organizationId,
         profileImageUrl: null,
