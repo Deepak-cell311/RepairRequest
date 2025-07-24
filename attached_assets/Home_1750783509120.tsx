@@ -252,7 +252,7 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center space-x-3 mb-4">
-                <img src="/Logo.png" alt="RepairRequest Logo" className="w-8 h-8" />
+                <img src="/RepairRequest Logo Transparent_1750783382845.png" alt="RepairRequest Logo" className="w-8 h-8" />
                 <div>
                   <h3 className="text-lg font-bold">RepairRequest</h3>
                   <p className="text-sm text-gray-400">by SchoolHouse Logistics</p>
