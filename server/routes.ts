@@ -219,68 +219,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // } catch (error) {
   //   console.error("Failed to set up Google authentication:", error);
   // }
-
-  // === GOOGLE OAUTH SETUP ===
-  passport.use(new GoogleStrategy({
-    clientID: `${process.env.GOOGLE_CLIENT_ID}`,
-    clientSecret: `${process.env.GOOGLE_CLIENT_SECRET}`,
-    callbackURL: "/api/auth/google/callback",
-  }, async (accessToken, refreshToken, profile, done) => {
-    try {
-      // Find or create user in DB
-      const email = profile.emails?.[0]?.value;
-      const firstName = profile.name?.givenName || "";
-      const lastName = profile.name?.familyName || "";
-      if (!email) return done(null, false, { message: "No email from Google" });
-      let user = await dbStorage.getUserByEmail(email);
-      if (!user) {
-        // Create user with default role requester
-        user = await dbStorage.upsertUser({
-          id: profile.id,
-          email,
-          firstName,
-          lastName,
-          password: null,
-          role: "requester",
-          organizationId: null,
-          profileImageUrl: profile.photos?.[0]?.value || null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-      }
-      return done(null, user);
-    } catch (err) {
-      return done(err);
+// === GOOGLE OAUTH SETUP ===
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID!,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  callbackURL: `${process.env.API_URL}/api/auth/google/callback`, 
+}, async (accessToken, refreshToken, profile, done) => {
+  try {
+    // Find or create user in DB
+    const email = profile.emails?.[0]?.value;
+    const firstName = profile.name?.givenName || "";
+    const lastName = profile.name?.familyName || "";
+    if (!email) return done(null, false, { message: "No email from Google" });
+    let user = await dbStorage.getUserByEmail(email);
+    if (!user) {
+      // Create user with default role requester
+      user = await dbStorage.upsertUser({
+        id: profile.id,
+        email,
+        firstName,
+        lastName,
+        password: null,
+        role: "requester",
+        organizationId: null,
+        profileImageUrl: profile.photos?.[0]?.value || null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
     }
-  }));
+    return done(null, user);
+  } catch (err) {
+    return done(err);
+  }
+}));
 
-  passport.serializeUser((user: any, done) => {
-    done(null, user.id);
-  });
-  passport.deserializeUser(async (id: string, done) => {
-    try {
-      const user = await dbStorage.getUser(id);
-      done(null, user);
-    } catch (err) {
-      done(err);
-    }
-  });
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await dbStorage.getUser(id);
+    done(null, user);
+  } catch (err) {
+    done(err);
+  }
+});
 
-  app.use(passport.initialize());
-  app.use(passport.session());
+app.use(passport.initialize());
+app.use(passport.session());
 
-  // === GOOGLE OAUTH ROUTES ===
-  app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+// === GOOGLE OAUTH ROUTES ===
+app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
 
-  app.get(
-    "/api/auth/google/callback",
-    passport.authenticate("google", { failureRedirect: "/login" }),
-    (req, res) => {
-      // Successful authentication, redirect to dashboard or home
-      res.redirect("/");
-    }
-  );
+app.get(
+  "/api/auth/google/callback",
+  passport.authenticate("google", { failureRedirect: "/login" }),
+  (req, res) => {
+    res.redirect("/dashboard");
+  }
+);
 
+  // console.log('Google OAuth callback URL:', ${process.env.BASE_URL}/api/auth/google/callback);
   // PRIORITY OAUTH ROUTES: Register before all other middleware
 
   // OAuth callback handler that bypasses middleware conflicts
