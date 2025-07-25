@@ -51,7 +51,7 @@ export default function RequestForm() {
     },
   });
 
-  
+
   const form = useForm<RequestFormValues>({
     resolver: zodResolver(requestFormSchema),
     defaultValues: {
@@ -67,18 +67,18 @@ export default function RequestForm() {
       otherNeeds: "",
     }
   });
-  
+
   async function onSubmit(data: RequestFormValues) {
     setIsSubmitting(true);
     try {
       const res = await apiRequest("POST", "/api/requests", data);
       const newRequest = await res.json();
-      
+
       toast({
         title: "Request Submitted",
         description: "Your labor request has been submitted successfully.",
       });
-      
+
       navigate("/dashboard");
     } catch (error) {
       console.error("Error submitting request:", error);
@@ -91,24 +91,30 @@ export default function RequestForm() {
       setIsSubmitting(false);
     }
   }
-  
+
   const today = new Date().toISOString().split('T')[0];
   return (
     <div className="py-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
         <div className="mb-6 flex items-center">
-          <Button variant="ghost" className="mr-3 text-primary p-2" onClick={() => navigate("/manage-requests")}>
+          <Button variant="ghost" className="mr-3 text-primary p-2" onClick={() => {
+            if (user?.role === 'admin' || user?.role === 'super_admin') {
+              navigate("/manage-requests");
+            } else {
+              navigate("/dashboard");
+            }
+          }}>
             <ArrowLeft size={20} />
           </Button>
           <h1 className="text-2xl font-heading font-bold text-gray-900">New Labor Request</h1>
         </div>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>Labor Request Form</CardTitle>
             <CardDescription>Please fill out all required information for your labor request.</CardDescription>
           </CardHeader>
-          
+
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -119,11 +125,11 @@ export default function RequestForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Facility</FormLabel>
-                        <Select 
+                        <Select
                           onValueChange={(value) => {
                             field.onChange(value);
                             setSelectedFacility(value);
-                          }} 
+                          }}
                           defaultValue={field.value}
                         >
                           <FormControl>
@@ -153,7 +159,7 @@ export default function RequestForm() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={form.control}
                     name="event"
@@ -168,7 +174,7 @@ export default function RequestForm() {
                     )}
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                   <FormField
                     control={form.control}
@@ -183,15 +189,15 @@ export default function RequestForm() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={form.control}
                     name="priority"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Priority Level</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
+                        <Select
+                          onValueChange={field.onChange}
                           defaultValue={field.value}
                         >
                           <FormControl>
@@ -213,7 +219,7 @@ export default function RequestForm() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={form.control}
                     name="setupTime"
@@ -227,7 +233,7 @@ export default function RequestForm() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={form.control}
                     name="startTime"
@@ -241,7 +247,7 @@ export default function RequestForm() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={form.control}
                     name="endTime"
@@ -256,10 +262,10 @@ export default function RequestForm() {
                     )}
                   />
                 </div>
-                
+
                 <div>
                   <h3 className="text-lg font-heading font-medium text-gray-900 mb-4">Please describe your event in detail, including any items you may need</h3>
-                  
+
                   {selectedFacility && facilities && Array.isArray(facilities) ? (
                     <div className="space-y-4">
                       {(() => {
@@ -269,12 +275,12 @@ export default function RequestForm() {
                             <p className="text-gray-500">No items available for this facility</p>
                           );
                         }
-                        
+
                         return facility.availableItems.map((item: any, index: number) => {
                           const isSelected = form.watch("selectedItems").includes(item.name);
                           return (
                             <div key={item.name || index} className="flex items-center space-x-3 p-3 border rounded-md">
-                              <Checkbox 
+                              <Checkbox
                                 id={`item-${index}`}
                                 className="flex-shrink-0"
                                 checked={isSelected}
@@ -288,7 +294,7 @@ export default function RequestForm() {
                                 }}
                               />
                               <div className="flex-1">
-                                <label 
+                                <label
                                   htmlFor={`item-${index}`}
                                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                                 >
@@ -312,41 +318,41 @@ export default function RequestForm() {
                     // <p className="text-gray-500">Please select a facility to see available items</p>
                     ""
                   )}
-                
-                <div className="mt-6">
-                  <FormField
-                    control={form.control}
-                    name="otherNeeds"
-                    render={({ field }) => (
-                      <FormItem>
-                        {/* <FormLabel>Additional Notes or Special Requirements</FormLabel> */}
-                        <FormControl>
-                          <Textarea 
-                            rows={4} 
-                            placeholder="Please describe any specific items or services needed for this event..." 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+
+                  <div className="mt-6">
+                    <FormField
+                      control={form.control}
+                      name="otherNeeds"
+                      render={({ field }) => (
+                        <FormItem>
+                          {/* <FormLabel>Additional Notes or Special Requirements</FormLabel> */}
+                          <FormControl>
+                            <Textarea
+                              rows={4}
+                              placeholder="Please describe any specific items or services needed for this event..."
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
-                </div>
-                
+
                 <div className="border-t border-gray-200 pt-5">
-                  
+
                   <div className="flex justify-end">
-                    <Button 
-                      type="button" 
-                      variant="outline" 
+                    <Button
+                      type="button"
+                      variant="outline"
                       onClick={() => navigate("/")}
                       className="mr-3"
                     >
                       Cancel
                     </Button>
-                    <Button 
-                      type="submit" 
+                    <Button
+                      type="submit"
                       disabled={isSubmitting}
                     >
                       {isSubmitting ? "Submitting..." : "Submit Request"}

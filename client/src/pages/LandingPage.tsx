@@ -1,12 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Users, Clock, Shield, Mail, Building2, BarChart3 } from "lucide-react";
+import { CheckCircle, Users, Clock, Shield, Mail, Building2, BarChart3, Menu } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
 export default function LandingPage() {
   const [showVideo, setShowVideo] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleVideoEnd = () => {
     setShowVideo(false);
@@ -48,15 +49,39 @@ export default function LandingPage() {
 
             {/* Mobile Menu Button */}
             <div className="md:hidden">
-              <Button asChild className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Link to="/login">
-                  Login to Portal
-                </Link>
-              </Button>
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="p-2 rounded-md text-blue-600 hover:bg-blue-100"
+                aria-label="Open menu"
+              >
+                <Menu size={28} />
+              </button>
             </div>
           </div>
-    </div>
+        </div>
       </header >
+
+      {/* Mobile Menu Drawer */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex justify-end">
+          <div className="w-64 bg-white h-full shadow-lg p-6 flex flex-col space-y-4">
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="self-end text-gray-500 hover:text-blue-600 text-2xl"
+              aria-label="Close menu"
+            >
+              ×
+            </button>
+            <Link to="/" onClick={() => setMobileMenuOpen(false)} className="text-gray-700 hover:text-blue-600 text-lg">Home</Link>
+            <Link to="/pricing" onClick={() => setMobileMenuOpen(false)} className="text-gray-700 hover:text-blue-600 text-lg">Pricing</Link>
+            <Link to="/faq" onClick={() => setMobileMenuOpen(false)} className="text-gray-700 hover:text-blue-600 text-lg">FAQ</Link>
+            <Link to="/support" onClick={() => setMobileMenuOpen(false)} className="text-gray-700 hover:text-blue-600 text-lg">Support</Link>
+            <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
+              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">Login to Portal</Button>
+            </Link>
+          </div>
+        </div>
+      )}
 
     {/* Hero Section */ }
     < section className = "py-20 px-4 sm:px-6 lg:px-8" >

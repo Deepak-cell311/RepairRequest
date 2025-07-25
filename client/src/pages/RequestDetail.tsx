@@ -40,9 +40,15 @@ export default function RequestDetail({ id }: RequestDetailProps) {
       <div className="py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
           <div className="flex items-center mb-6">
-            <Button variant="ghost" className="mr-3" onClick={() => navigate("/")}>
-              <ArrowLeft size={20} />
-            </Button>
+          <Button variant="ghost" className="mr-3 text-primary p-2" onClick={() => {
+            if (user?.role === 'admin' || user?.role === 'super_admin') {
+              navigate("/manage-requests");
+            } else {
+              navigate("/dashboard");
+            }
+          }}>
+            <ArrowLeft size={20} />
+          </Button>
             <div className="h-8 w-48 bg-gray-200 animate-pulse rounded"></div>
           </div>
           <div className="bg-white shadow overflow-hidden sm:rounded-lg animate-pulse">
@@ -58,9 +64,15 @@ export default function RequestDetail({ id }: RequestDetailProps) {
       <div className="py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
           <div className="flex items-center mb-6">
-            <Button variant="ghost" className="mr-3" onClick={() => navigate("/")}>
-              <ArrowLeft size={20} />
-            </Button>
+          <Button variant="ghost" className="mr-3 text-primary p-2" onClick={() => {
+            if (user?.role === 'admin' || user?.role === 'super_admin') {
+              navigate("/manage-requests");
+            } else {
+              navigate("/dashboard");
+            }
+          }}>
+            <ArrowLeft size={20} />
+          </Button>
             <h1 className="text-2xl font-heading font-bold text-gray-900">Request Not Found</h1>
           </div>
           <Card>
@@ -99,7 +111,13 @@ export default function RequestDetail({ id }: RequestDetailProps) {
     <div className="py-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
         <div className="mb-6 flex items-center">
-          <Button variant="ghost" className="mr-3 text-primary p-2" onClick={() => navigate("/manage-requests")}>
+        <Button variant="ghost" className="mr-3 text-primary p-2" onClick={() => {
+            if (user?.role === 'admin' || user?.role === 'super_admin') {
+              navigate("/manage-requests");
+            } else {
+              navigate("/my-requests");
+            }
+          }}>
             <ArrowLeft size={20} />
           </Button>
           <h1 className="text-2xl font-heading font-bold text-gray-900">Request Details</h1>
