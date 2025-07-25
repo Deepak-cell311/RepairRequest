@@ -275,7 +275,18 @@ app.get(
   "/api/auth/google/callback",
   passport.authenticate("google", { failureRedirect: "/login" }),
   (req, res) => {
-    res.redirect("/dashboard");
+    const user = req.user as any;
+    // Set session for user (same as normal login)
+    req.session.user = {
+      id: user.id,
+      email: user.email || '',
+      role: user.role,
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      organizationId: user.organizationId ?? undefined
+    };
+    const role = user.role || "requester";
+    res.redirect(`/auth-redirect?role=${role}`);
   }
 );
 

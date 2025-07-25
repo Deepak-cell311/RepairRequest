@@ -34,6 +34,7 @@ import SignupPage from "./pages/SignupPage";
 import LoginPage from "./pages/LoginPage";
 import { BrowserRouter, Outlet, Route, Routes, useParams } from "react-router-dom";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import AuthRedirect from "./pages/auth-redirect";
 
 function RequestDetailWrapper() {
   const { id } = useParams();
@@ -123,6 +124,7 @@ function AppContent() {
             <Route path="/admin/organizations" element={<AdminOrganizations />} />
             <Route path="/admin/buildings-facilities" element={<AdminBuildingsFacilities />} />
             <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/auth-redirect" element={<AuthRedirect />} />
           </Route>
         )}
 
