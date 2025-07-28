@@ -201,7 +201,7 @@ export default function BuildingRequestForm() {
                     name="facility"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Labor</FormLabel>
+                        <FormLabel>Building</FormLabel>
                         <Select 
                           onValueChange={(value) => {
                             field.onChange(value);
@@ -211,7 +211,7 @@ export default function BuildingRequestForm() {
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select a facility" />
+                              <SelectValue placeholder="Select a building" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>

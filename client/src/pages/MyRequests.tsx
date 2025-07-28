@@ -30,7 +30,7 @@ export default function MyRequests() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-heading font-bold text-gray-900">My Requests</h1>
           <div className="space-x-2">
-            <Button onClick={() => navigate("/new-facilities-request")}>New Facilities Request</Button>
+            <Button onClick={() => navigate("/new-facilities-request")}>New Labor Request</Button>
             <Button variant="outline" onClick={() => navigate("/new-building-request")}>New Building Request</Button>
           </div>
         </div>

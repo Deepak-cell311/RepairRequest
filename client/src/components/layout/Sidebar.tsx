@@ -33,6 +33,8 @@ export default function Sidebar({ isMobileOpen, closeMobileSidebar, user }: Side
     { href: "/dashboard", label: "Dashboard", icon: "dashboard", access: "admin" },
     { href: "/manage-requests", label: "Manage Requests", icon: "manage_accounts", access: "admin" },
     { href: "/room-history", label: "Room History", icon: "history", access: "admin" },
+    { href: "/new-building-request", label: "New Repair Request", icon: "home_repair_service", access: "admin" },
+    { href: "/new-facilities-request", label: "New Labor Request", icon: "event_seat", access: "admin" },
     { href: "/reports", label: "Reports", icon: "assessment", access: "admin" },
     { href: "/assigned-requests", label: "Assigned to Me", icon: "engineering", access: "admin" },
   ] : user?.role === 'maintenance' ? [

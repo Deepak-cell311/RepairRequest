@@ -269,7 +269,10 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // === GOOGLE OAUTH ROUTES ===
-app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+app.get("/api/auth/google", passport.authenticate("google", { 
+  scope: ["profile", "email"],
+  prompt: "select_account"
+}));
 
 app.get(
   "/api/auth/google/callback",
