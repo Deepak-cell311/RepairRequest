@@ -24,6 +24,11 @@ export default function Dashboard() {
     enabled: user?.role === 'maintenance',
   });
   
+  // Fetch organizations
+  const { data: organizations, isLoading: isLoadingOrgs } = useQuery({
+    queryKey: ["/api/admin/organizations"],
+  });
+  
   return (
     <div className="py-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
@@ -296,29 +301,35 @@ export default function Dashboard() {
         
         {/* Campus Facilities */}
         <div className="mt-8">
-          <h2 className="text-lg font-heading font-medium text-gray-900">Campus Facilities</h2>
+          <h2 className="text-lg font-heading font-medium text-gray-900">Organizations</h2>
           <div className="mt-4 grid gap-6 grid-cols-1 md:grid-cols-2">
-            <div className="relative rounded-lg overflow-hidden h-48 shadow-md">
-              <img 
-                src="/attached_assets/2024-09-03_1750801709551.webp" 
-                alt="Canterbury Upper School" 
-                className="w-full h-full object-cover" 
-              />
-              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
-                <h3 className="text-white font-heading font-medium">Upper School</h3>
-              </div>
-            </div>
-            
-            <div className="relative rounded-lg overflow-hidden h-48 shadow-md">
-              <img 
-                src="/attached_assets/lower school_1750801746691.jpg" 
-                alt="Canterbury Lower School" 
-                className="w-full h-full object-cover" 
-              />
-              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
-                <h3 className="text-white font-heading font-medium">Lower School</h3>
-              </div>
-            </div>
+            {isLoadingOrgs ? (
+              <div>Loading...</div>
+            ) : organizations && organizations.length > 0 ? (
+              organizations.map((org: any) => (
+                <div key={org.id} className="relative rounded-lg overflow-hidden h-48 shadow-md flex gap-2">
+                  {org.image1Url && (
+                    <img
+                      src={org.image1Url}
+                      alt={org.name + ' image 1'}
+                      className="w-1/2 h-full object-cover"
+                    />
+                  )}
+                  {org.image2Url && (
+                    <img
+                      src={org.image2Url}
+                      alt={org.name + ' image 2'}
+                      className="w-1/2 h-full object-cover"
+                    />
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
+                    <h3 className="text-white font-heading font-medium">{org.name}</h3>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div>No organizations found</div>
+            )}
           </div>
         </div>
       </div>

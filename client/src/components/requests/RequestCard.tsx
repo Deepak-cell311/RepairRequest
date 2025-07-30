@@ -22,7 +22,7 @@ export default function RequestCard({ request, showRequestor = false }: RequestC
   const timeDisplay = times.length > 0 ? times.join(' - ') : 'Time not specified';
 
   return (
-    <li className="request-card">
+    <li className="request-card list-none">
       <Link to={`/requests/${request.id}`}>
         <a className="block hover:bg-gray-50">
           <div className="px-4 py-4 sm:px-6">

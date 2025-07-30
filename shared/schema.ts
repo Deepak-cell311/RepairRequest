@@ -33,6 +33,8 @@ export const organizations = pgTable("organizations", {
   slug: varchar("slug").unique().notNull(), // URL-friendly identifier
   domain: varchar("domain"), // Optional: auto-assign users by email domain
   logoUrl: varchar("logo_url"),
+  image1Url: varchar("image1_url"), // New field for first image
+  image2Url: varchar("image2_url"), // New field for second image
   settings: jsonb("settings"), // Custom settings per organization
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

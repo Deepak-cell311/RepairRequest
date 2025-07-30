@@ -961,7 +961,7 @@ app.get(
   app.post("/api/admin/organizations", async (req: any, res) => {
     try {
       console.log("Creating organization:", req.body);
-      const { name, slug, domain, logoUrl } = req.body;
+      const { name, slug, domain, logoUrl, image1Url, image2Url } = req.body;
 
       // Validate required fields
       if (!name || !slug) {
@@ -973,6 +973,8 @@ app.get(
         slug,
         domain: domain || null,
         logoUrl: logoUrl || null,
+        image1Url: image1Url || null,
+        image2Url: image2Url || null,
         settings: {}
       });
 
@@ -988,13 +990,15 @@ app.get(
   app.patch("/api/admin/organizations/:id", async (req: any, res) => {
     try {
       const { id } = req.params;
-      const { name, domain, logoUrl } = req.body;
+      const { name, domain, logoUrl, image1Url, image2Url } = req.body;
 
       console.log("Updating organization:", id, req.body);
       const organization = await dbStorage.updateOrganization(parseInt(id), {
         name,
         domain: domain || null,
-        logoUrl: logoUrl || null
+        logoUrl: logoUrl || null,
+        image1Url: image1Url || null,
+        image2Url: image2Url || null,
       });
 
       res.json(organization);
@@ -1912,6 +1916,8 @@ app.get(
         slug: req.body.slug,
         domain: req.body.domain,
         logoUrl: req.body.logoUrl,
+        image1Url: req.body.image1Url,
+        image2Url: req.body.image2Url,
         settings: req.body.settings || {}
       };
 
@@ -2492,7 +2498,7 @@ app.get(
         return res.status(403).json({ error: "Access denied. Super admin required." });
       }
 
-      const { name, slug, domain, logoUrl } = req.body;
+      const { name, slug, domain, logoUrl, image1Url, image2Url } = req.body;
 
       // Validate required fields
       if (!name || !slug) {
@@ -2504,6 +2510,8 @@ app.get(
         slug,
         domain: domain || null,
         logoUrl: logoUrl || null,
+        image1Url: image1Url || null,
+        image2Url: image2Url || null,
         settings: {}
       });
 
@@ -2524,12 +2532,14 @@ app.get(
       }
 
       const { id } = req.params;
-      const { name, domain, logoUrl } = req.body;
+      const { name, domain, logoUrl, image1Url, image2Url } = req.body;
 
       const organization = await dbStorage.updateOrganization(parseInt(id), {
         name,
         domain: domain || null,
-        logoUrl: logoUrl || null
+        logoUrl: logoUrl || null,
+        image1Url: image1Url || null,
+        image2Url: image2Url || null,
       });
 
       res.json(organization);

@@ -52,8 +52,17 @@ export default function RoomHistory() {
     enabled: isAuthenticated && !!selectedBuilding,
   });
 
-  // Filter requests based on search term and date range
+  // Filter requests based on search term, date range, and user role
   const filteredRequests = requests.filter((request: any) => {
+    // Only show own requests for requester
+    if (user?.role === "requester") {
+      // Use request.requestor.id for the user ID
+      const requestUserId = request.requestor?.id;
+      if (requestUserId !== user.id) {
+        return false;
+      }
+    }
+    
     // Filter by search term if provided
     const matchesSearch = !searchTerm || 
       request.event.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -203,10 +212,11 @@ export default function RoomHistory() {
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
-                {selectedBuilding ? 
-                  `No repair requests found for ${selectedBuilding}${selectedRoom ? ` - Room ${selectedRoom}` : ''}` :
-                  'Select a building to view maintenance history'
-                }
+                {user?.role === "requester"
+                  ? "You have not submitted any requests for this room yet."
+                  : selectedBuilding
+                  ? `No repair requests found for ${selectedBuilding}${selectedRoom ? ` - Room ${selectedRoom}` : ""}`
+                  : "Select a building to view maintenance history"}
               </div>
             )}
           </CardContent>

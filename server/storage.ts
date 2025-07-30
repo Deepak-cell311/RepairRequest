@@ -177,11 +177,26 @@ export class DatabaseStorage implements IStorage {
   async getAllOrganizations(): Promise<any[]> {
     console.log("Storage: getAllOrganizations called");
     try {
-      const orgList = await db
-        .select()
-        .from(organizations)
-        .orderBy(organizations.name);
-      return orgList;
+      const orgList = await db.select().from(organizations).orderBy(organizations.name);
+
+      // For each org, fetch userCount and buildingCount using raw SQL
+      const results = await Promise.all(orgList.map(async (org) => {
+        const userCountResult = await db.execute(
+          sql`SELECT COUNT(*)::int AS count FROM users WHERE organization_id = ${org.id}`
+        );
+        const buildingCountResult = await db.execute(
+          sql`SELECT COUNT(*)::int AS count FROM buildings WHERE organization_id = ${org.id}`
+        );
+        const userCount = userCountResult.rows?.[0]?.count ?? 0;
+        const buildingCount = buildingCountResult.rows?.[0]?.count ?? 0;
+        return {
+          ...org,
+          userCount: Number(userCount) || 0,
+          buildingCount: Number(buildingCount) || 0,
+        };
+      }));
+
+      return results;
     } catch (error) {
       console.error("Storage: Error in getAllOrganizations:", error);
       throw error;

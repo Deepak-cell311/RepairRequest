@@ -19,6 +19,8 @@ interface Organization {
   createdAt: string;
   userCount?: number;
   buildingCount?: number;
+  image1Url?: string;
+  image2Url?: string;
 }
 
 export default function AdminOrganizations() {
@@ -49,10 +51,10 @@ export default function AdminOrganizations() {
       toast({ title: "Organization created successfully" });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Error creating organization", 
+      toast({
+        title: "Error creating organization",
         description: error.message,
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -108,6 +110,8 @@ export default function AdminOrganizations() {
       slug: formData.get("slug"),
       domain: formData.get("domain") || null,
       logoUrl: formData.get("logoUrl") || null,
+      image1Url: formData.get("image1Url") || null,
+      image2Url: formData.get("image2Url") || null,
     };
     createOrgMutation.mutate(orgData);
   };
@@ -115,13 +119,15 @@ export default function AdminOrganizations() {
   const handleUpdateOrg = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedOrg) return;
-    
+
     const formData = new FormData(e.currentTarget);
     const orgData = {
       id: selectedOrg.id,
       name: formData.get("name"),
       domain: formData.get("domain") || null,
       logoUrl: formData.get("logoUrl") || null,
+      image1Url: formData.get("image1Url") || null,
+      image2Url: formData.get("image2Url") || null,
     };
     updateOrgMutation.mutate(orgData);
   };
@@ -177,6 +183,15 @@ export default function AdminOrganizations() {
                   <Label htmlFor="logoUrl">Logo URL (Optional)</Label>
                   <Input id="logoUrl" name="logoUrl" placeholder="https://..." />
                 </div>
+                <div>
+                  <Label htmlFor="image1Url">Image 1 URL</Label>
+                  <Input id="image1Url" name="image1Url" placeholder="https://..." />
+                </div>
+                <div>
+                  <Label htmlFor="image2Url">Image 2 URL</Label>
+                  <Input id="image2Url" name="image2Url" placeholder="https://..." />
+                </div>
+                
               </div>
               <div className="flex gap-2">
                 <Button type="submit" disabled={createOrgMutation.isPending}>
@@ -205,6 +220,17 @@ export default function AdminOrganizations() {
                       <Building2 className="h-6 w-6 text-blue-600" />
                     </div>
                   )}
+                  {/* Show image1Url and image2Url side by side if present */}
+                  {/* {(org.image1Url || org.image2Url) && (
+                    <div className="flex gap-2 ml-2">
+                      {org.image1Url && (
+                        <img src={org.image1Url} alt={org.name + ' image 1'} className="h-12 w-12 rounded-lg object-cover border" />
+                      )}
+                      {org.image2Url && (
+                        <img src={org.image2Url} alt={org.name + ' image 2'} className="h-12 w-12 rounded-lg object-cover border" />
+                      )}
+                    </div>
+                  )} */}
                   <div>
                     <CardTitle>{org.name}</CardTitle>
                     <CardDescription>
@@ -212,8 +238,8 @@ export default function AdminOrganizations() {
                     </CardDescription>
                   </div>
                 </div>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => setSelectedOrg(org)}
                 >
@@ -255,28 +281,46 @@ export default function AdminOrganizations() {
               <form onSubmit={handleUpdateOrg} className="space-y-4">
                 <div>
                   <Label htmlFor="edit-name">Organization Name</Label>
-                  <Input 
-                    id="edit-name" 
-                    name="name" 
+                  <Input
+                    id="edit-name"
+                    name="name"
                     defaultValue={selectedOrg.name}
-                    required 
+                    required
                   />
                 </div>
                 <div>
                   <Label htmlFor="edit-domain">Email Domain</Label>
-                  <Input 
-                    id="edit-domain" 
-                    name="domain" 
+                  <Input
+                    id="edit-domain"
+                    name="domain"
                     defaultValue={selectedOrg.domain || ""}
                     placeholder="organization.edu"
                   />
                 </div>
                 <div>
                   <Label htmlFor="edit-logoUrl">Logo URL</Label>
-                  <Input 
-                    id="edit-logoUrl" 
-                    name="logoUrl" 
+                  <Input
+                    id="edit-logoUrl"
+                    name="logoUrl"
                     defaultValue={selectedOrg.logoUrl || ""}
+                    placeholder="https://..."
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-image1Url">Image 1 URL</Label>
+                  <Input
+                    id="edit-image1Url"
+                    name="image1Url"
+                    defaultValue={selectedOrg.image1Url || ""}
+                    placeholder="https://..."
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-image2Url">Image 2 URL</Label>
+                  <Input
+                    id="edit-image2Url"
+                    name="image2Url"
+                    defaultValue={selectedOrg.image2Url || ""}
                     placeholder="https://..."
                   />
                 </div>
