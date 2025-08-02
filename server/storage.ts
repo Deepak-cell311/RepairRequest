@@ -11,6 +11,8 @@ import {
   buildings,
   facilities,
   passwordResetTokens,
+  routineMaintenance,
+  routineMaintenancePhotos,
   type User,
   type UpsertUser,
   type InsertRequest,
@@ -33,6 +35,10 @@ import {
   type InsertBuilding,
   type Facility,
   type InsertFacility,
+  type InsertRoutineMaintenance,
+  type RoutineMaintenance,
+  type InsertRoutineMaintenancePhoto,
+  type RoutineMaintenancePhoto,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, count, sql, or, isNull, asc } from "drizzle-orm";
@@ -146,6 +152,15 @@ export interface IStorage {
   verifyResetToken(userId: string, token: string): Promise<boolean>;
   clearResetToken(userId: string): Promise<void>;
   updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
+  
+  // Routine maintenance operations
+  createRoutineMaintenance(maintenanceData: InsertRoutineMaintenance): Promise<RoutineMaintenance>;
+  getRoutineMaintenance(id: number): Promise<RoutineMaintenance | undefined>;
+  getAllRoutineMaintenance(organizationId: number): Promise<RoutineMaintenance[]>;
+  updateRoutineMaintenance(id: number, updates: Partial<InsertRoutineMaintenance>): Promise<RoutineMaintenance>;
+  deleteRoutineMaintenance(id: number): Promise<void>;
+  saveRoutineMaintenancePhoto(photoData: InsertRoutineMaintenancePhoto & { fileBuffer?: Buffer }): Promise<RoutineMaintenancePhoto>;
+  getRoutineMaintenancePhotos(maintenanceId: number): Promise<RoutineMaintenancePhoto[]>;
  
 
 }
@@ -1294,6 +1309,125 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error updating user password:", error);
       throw error;
+    }
+  }
+
+  // Routine maintenance operations
+  async createRoutineMaintenance(maintenanceData: InsertRoutineMaintenance): Promise<RoutineMaintenance> {
+    try {
+      const [result] = await db.insert(routineMaintenance).values(maintenanceData).returning();
+      console.log(`Routine maintenance created with ID: ${result.id}`);
+      return result;
+    } catch (error) {
+      console.error("Error creating routine maintenance:", error);
+      throw error;
+    }
+  }
+
+  async getRoutineMaintenance(id: number): Promise<RoutineMaintenance | undefined> {
+    try {
+      const [result] = await db
+        .select()
+        .from(routineMaintenance)
+        .where(eq(routineMaintenance.id, id));
+      
+      return result;
+    } catch (error) {
+      console.error("Error getting routine maintenance:", error);
+      return undefined;
+    }
+  }
+
+  async getAllRoutineMaintenance(organizationId: number): Promise<RoutineMaintenance[]> {
+    try {
+      return await db
+        .select()
+        .from(routineMaintenance)
+        .where(eq(routineMaintenance.organizationId, organizationId))
+        .orderBy(desc(routineMaintenance.createdAt));
+    } catch (error) {
+      console.error("Error getting all routine maintenance:", error);
+      return [];
+    }
+  }
+
+  async updateRoutineMaintenance(id: number, updates: Partial<InsertRoutineMaintenance>): Promise<RoutineMaintenance> {
+    try {
+      const [result] = await db
+        .update(routineMaintenance)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(routineMaintenance.id, id))
+        .returning();
+      
+      console.log(`Routine maintenance updated with ID: ${id}`);
+      return result;
+    } catch (error) {
+      console.error("Error updating routine maintenance:", error);
+      throw error;
+    }
+  }
+
+  async deleteRoutineMaintenance(id: number): Promise<void> {
+    try {
+      await db.delete(routineMaintenance).where(eq(routineMaintenance.id, id));
+      console.log(`Routine maintenance deleted with ID: ${id}`);
+    } catch (error) {
+      console.error("Error deleting routine maintenance:", error);
+      throw error;
+    }
+  }
+
+  async saveRoutineMaintenancePhoto(photoData: InsertRoutineMaintenancePhoto & { fileBuffer?: Buffer }): Promise<RoutineMaintenancePhoto> {
+    try {
+      const { fileBuffer, ...dbData } = photoData;
+      
+      if (fileBuffer) {
+        // Generate unique filename
+        const timestamp = Date.now();
+        const randomId = Math.floor(Math.random() * 1000000);
+        const extension = photoData.originalFilename?.split('.').pop() || 'jpg';
+        const filename = `routine-maintenance-${timestamp}-${randomId}.${extension}`;
+        
+        // Upload to S3 if configured, otherwise save locally
+        let photoUrl;
+        if (S3_BUCKET) {
+          const key = `routine-maintenance-photos/${filename}`;
+          photoUrl = await uploadFileToS3(key, fileBuffer, photoData.mimeType || 'image/jpeg');
+        } else {
+          // Save locally
+          const uploadDir = path.join(process.cwd(), 'uploads', 'photos');
+          if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+          }
+          
+          const filePath = path.join(uploadDir, filename);
+          fs.writeFileSync(filePath, fileBuffer);
+          photoUrl = `/uploads/photos/${filename}`;
+        }
+        
+        dbData.photoUrl = photoUrl;
+        dbData.filename = filename;
+      }
+      
+      const [result] = await db.insert(routineMaintenancePhotos).values(dbData).returning();
+      console.log(`Routine maintenance photo saved with ID: ${result.id}`);
+      return result;
+    } catch (error) {
+      console.error("Error saving routine maintenance photo:", error);
+      throw error;
+    }
+  }
+
+  async getRoutineMaintenancePhotos(maintenanceId: number): Promise<RoutineMaintenancePhoto[]> {
+    try {
+      return await db
+        .select()
+        .from(routineMaintenancePhotos)
+        .where(eq(routineMaintenancePhotos.routineMaintenanceId, maintenanceId))
+        .orderBy(asc(routineMaintenancePhotos.uploadedAt));
+    } catch (error) {
+      console.error("Error getting routine maintenance photos:", error);
+      return [];
     }
   }
 }

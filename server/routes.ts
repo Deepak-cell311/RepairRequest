@@ -227,6 +227,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+ 
+
+  app.get("/api/routine-maintenance", async (req, res) => {
+    try {
+      const { user } = req as any;
+      if (!user) {
+        return res.status(401).json({ 
+          status: "error", 
+          error: { message: "Authentication required" } 
+        });
+      }
+
+      const maintenance = await dbStorage.getAllRoutineMaintenance(user.organizationId);
+      
+      return res.json({ 
+        status: "success", 
+        data: maintenance 
+      });
+
+    } catch (error) {
+      console.error('❌ Error getting routine maintenance:', error);
+      return res.status(500).json({ 
+        status: "error", 
+        error: { message: "Failed to get routine maintenance tasks" } 
+      });
+    }
+  });
+
+  app.get("/api/routine-maintenance/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { user } = req as any;
+      
+      if (!user) {
+        return res.status(401).json({ 
+          status: "error", 
+          error: { message: "Authentication required" } 
+        });
+      }
+
+      const maintenance = await dbStorage.getRoutineMaintenance(parseInt(id));
+      
+      if (!maintenance) {
+        return res.status(404).json({ 
+          status: "error", 
+          error: { message: "Routine maintenance task not found" } 
+        });
+      }
+
+      // Get photos for this maintenance task
+      const photos = await dbStorage.getRoutineMaintenancePhotos(parseInt(id));
+
+      return res.json({ 
+        status: "success", 
+        data: { ...maintenance, photos } 
+      });
+
+    } catch (error) {
+      console.error('❌ Error getting routine maintenance details:', error);
+      return res.status(500).json({ 
+        status: "error", 
+        error: { message: "Failed to get routine maintenance details" } 
+      });
+    }
+  });
+
   app.post("/api/admin/users/bulk", isAuthenticated, async (req: any, res) => {
     try {
       console.log("=== BULK IMPORT SESSION DEBUG ===");
@@ -1188,6 +1254,118 @@ app.get(
   // Simple test endpoint
   app.get("/api/test-simple", (req, res) => {
     res.json({ message: "Server is working", timestamp: new Date().toISOString() });
+  });
+
+   // Routine Maintenance API Routes
+   app.post("/api/routine-maintenance", upload.array('photos', 5), async (req, res) => {
+    try {
+      console.log('=== ROUTINE MAINTENANCE SUBMIT ===');
+      
+      const { user } = req as any;
+      if (!user) {
+        return res.status(401).json({ 
+          status: "error", 
+          error: { message: "Authentication required" } 
+        });
+      }
+
+      // Check if user has permission
+      if (!["admin", "super_admin", "maintenance"].includes(user.role)) {
+        return res.status(403).json({ 
+          status: "error", 
+          error: { message: "Only admin and maintenance users can create routine maintenance tasks" } 
+        });
+      }
+
+      const {
+        facility,
+        event,
+        dateBegun,
+        recurrence,
+        customRecurrence,
+        'maintenance.roomNumber': roomNumber,
+        'maintenance.description': description,
+      } = req.body;
+
+      console.log('Form data received:', {
+        facility,
+        event,
+        dateBegun,
+        recurrence,
+        customRecurrence,
+        roomNumber,
+        description,
+        photosCount: req.files?.length || 0
+      });
+
+      // Validate required fields
+      if (!facility || !event || !dateBegun || !recurrence || !roomNumber || !description) {
+        return res.status(400).json({ 
+          status: "error", 
+          error: { message: "All required fields must be provided" } 
+        });
+      }
+
+      // Create routine maintenance record
+      const maintenanceData = {
+        organizationId: user.organizationId,
+        facility,
+        event,
+        dateBegun: new Date(dateBegun),
+        recurrence,
+        customRecurrence: customRecurrence || null,
+        roomNumber,
+        description,
+        createdById: user.id,
+      };
+
+      console.log('Creating routine maintenance with data:', maintenanceData);
+
+      const routineMaintenance = await dbStorage.createRoutineMaintenance(maintenanceData);
+      console.log('✅ Routine maintenance created with ID:', routineMaintenance.id);
+
+      // Handle photo uploads
+      if (req.files && req.files.length > 0) {
+        console.log(`Processing ${req.files.length} photos...`);
+        
+        for (const file of req.files as any[]) {
+          try {
+            const photoData = {
+              routineMaintenanceId: routineMaintenance.id,
+              photoUrl: '', // Will be set by storage function
+              filename: file.originalname,
+              originalFilename: file.originalname,
+              filePath: file.path,
+              mimeType: file.mimetype,
+              size: file.size,
+              uploadedById: user.id,
+              fileBuffer: file.buffer,
+            };
+
+            await dbStorage.saveRoutineMaintenancePhoto(photoData);
+            console.log(`✅ Photo saved for maintenance ID: ${routineMaintenance.id}`);
+          } catch (photoError) {
+            console.error('❌ Error saving photo:', photoError);
+            // Continue with other photos even if one fails
+          }
+        }
+      }
+
+      return res.json({ 
+        status: "success", 
+        data: { 
+          id: routineMaintenance.id,
+          message: "Routine maintenance task created successfully" 
+        } 
+      });
+
+    } catch (error) {
+      console.error('❌ Error in routine maintenance route:', error);
+      return res.status(500).json({ 
+        status: "error", 
+        error: { message: "Failed to create routine maintenance task" } 
+      });
+    }
   });
 
   // Test upload endpoint for debugging (no auth for testing)

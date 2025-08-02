@@ -35,6 +35,7 @@ export default function Sidebar({ isMobileOpen, closeMobileSidebar, user }: Side
     { href: "/room-history", label: "Room History", icon: "history", access: "admin" },
     { href: "/new-building-request", label: "New Repair Request", icon: "home_repair_service", access: "admin" },
     { href: "/new-facilities-request", label: "New Labor Request", icon: "event_seat", access: "admin" },
+    { href: "/routine-maintenance", label: "Routine Maintenance", icon: "schedule", access: "admin" },
     { href: "/reports", label: "Reports", icon: "assessment", access: "admin" },
     { href: "/assigned-requests", label: "Assigned to Me", icon: "engineering", access: "admin" },
   ] : user?.role === 'maintenance' ? [
@@ -42,15 +43,16 @@ export default function Sidebar({ isMobileOpen, closeMobileSidebar, user }: Side
     { href: "/dashboard", label: "Dashboard", icon: "dashboard", access: "maintenance" },
     { href: "/assigned-requests", label: "Assigned to Me", icon: "engineering", access: "maintenance" },
     { href: "/room-history", label: "Room History", icon: "history", access: "maintenance" },
-
     { href: "/manage-requests", label: "Manage Requests", icon: "manage_accounts", access: "maintenance" },
     { href: "/new-building-request", label: "New Repair Request", icon: "home_repair_service", access: "maintenance" },
     { href: "/new-facilities-request", label: "New Facilities Request", icon: "event_seat", access: "maintenance" },
+    { href: "/routine-maintenance", label: "Routine Maintenance", icon: "schedule", access: "all" },
   ] : [
     // Regular user menu
     { href: "/dashboard", label: "Dashboard", icon: "dashboard", access: "all" },
     { href: "/new-building-request", label: "New Repair Request", icon: "home_repair_service", access: "all" },
     { href: "/new-facilities-request", label: "New Labor Request", icon: "event_seat", access: "all" },
+    { href: "/routine-maintenance", label: "Routine Maintenance", icon: "schedule", access: "all" },
     { href: "/my-requests", label: "My Requests", icon: "assignment", access: "all" },
     { href: "/room-history", label: "Room History", icon: "history", access: "all" },
   ];
