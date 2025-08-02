@@ -10,6 +10,7 @@ import {
   organizations,
   buildings,
   facilities,
+  passwordResetTokens,
   type User,
   type UpsertUser,
   type InsertRequest,
@@ -140,6 +141,12 @@ export interface IStorage {
   // Email notifications
   getOrganizationAdminEmails(organizationId: number): Promise<string[]>;
   
+  // Password reset operations
+  storeResetToken(userId: string, token: string, expiresAt: Date): Promise<void>;
+  verifyResetToken(userId: string, token: string): Promise<boolean>;
+  clearResetToken(userId: string): Promise<void>;
+  updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
+ 
 
 }
 
@@ -1212,6 +1219,81 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error getting organization admin emails:", error);
       return [];
+    }
+  }
+
+  // Password reset operations
+  async storeResetToken(userId: string, token: string, expiresAt: Date): Promise<void> {
+    try {
+      // Clear any existing tokens for this user
+      await db
+        .delete(passwordResetTokens)
+        .where(eq(passwordResetTokens.userId, userId));
+
+      // Insert new token
+      await db.insert(passwordResetTokens).values({
+        userId,
+        token,
+        expiresAt,
+        used: false,
+      });
+      
+      console.log(`Reset token stored for user: ${userId}`);
+    } catch (error) {
+      console.error("Error storing reset token:", error);
+      throw error;
+    }
+  }
+
+  async verifyResetToken(userId: string, token: string): Promise<boolean> {
+    try {
+      const resetToken = await db
+        .select()
+        .from(passwordResetTokens)
+        .where(
+          and(
+            eq(passwordResetTokens.userId, userId),
+            eq(passwordResetTokens.token, token),
+            eq(passwordResetTokens.used, false),
+            sql`${passwordResetTokens.expiresAt} > NOW()`
+          )
+        )
+        .limit(1);
+
+      const isValid = resetToken.length > 0;
+      console.log(`Token verification for user ${userId}: ${isValid ? 'valid' : 'invalid'}`);
+      return isValid;
+    } catch (error) {
+      console.error("Error verifying reset token:", error);
+      return false;
+    }
+  }
+
+  async clearResetToken(userId: string): Promise<void> {
+    try {
+      await db
+        .update(passwordResetTokens)
+        .set({ used: true })
+        .where(eq(passwordResetTokens.userId, userId));
+      
+      console.log(`Reset token cleared for user: ${userId}`);
+    } catch (error) {
+      console.error("Error clearing reset token:", error);
+      throw error;
+    }
+  }
+
+  async updateUserPassword(userId: string, hashedPassword: string): Promise<void> {
+    try {
+      await db
+        .update(users)
+        .set({ password: hashedPassword })
+        .where(eq(users.id, userId));
+      
+      console.log(`Password updated for user: ${userId}`);
+    } catch (error) {
+      console.error("Error updating user password:", error);
+      throw error;
     }
   }
 }

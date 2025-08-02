@@ -34,6 +34,7 @@ import SignupPage from "./pages/SignupPage";
 import LoginPage from "./pages/LoginPage";
 import { BrowserRouter, Outlet, Route, Routes, useParams } from "react-router-dom";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPassword from "./pages/ResetPassword";
 import AuthRedirect from "./pages/auth-redirect";
 
 function RequestDetailWrapper() {
@@ -108,6 +109,7 @@ function AppContent() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Protected routes */}
         {isAuthenticated && (

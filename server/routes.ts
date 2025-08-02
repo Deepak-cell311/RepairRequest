@@ -89,8 +89,6 @@ const s3 = new AWS.S3();
 export async function registerRoutes(app: Express): Promise<Server> {
 
   // Forgot password endpoint
-
-
   app.post("/api/forgot-password", async (req, res) => {
     const { email } = req.body;
     if (!email) {
@@ -102,22 +100,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ status: "error", error: { message: "User not found" } });
       }
 
+      console.log('=== FORGOT PASSWORD EMAIL REQUEST ===');
+      console.log('User email:', user.email);
+      console.log('SendGrid API key exists:', !!process.env.SENDGRID_API_KEY);
+      console.log('From email:', process.env.SENDGRID_FROM_EMAIL || "notifications@repairrequest.org");
+
+      // Generate reset token and link
+      const resetToken = crypto.randomUUID();
+      const resetLink = `${process.env.VITE_API_URL || 'http://localhost:5001'}/reset-password?token=${resetToken}&email=${encodeURIComponent(user.email)}`;
+      
+      // Store reset token in database
+      await dbStorage.storeResetToken(user.id, resetToken, new Date(Date.now() + 3600000)); // 1 hour expiry
+      
+      console.log('Reset link generated:', resetLink);
+
       // Actually send the email
       const emailSent = await sendEmail({
-        to: user.email,
-        from: process.env.SENDGRID_FROM_EMAIL || "no-reply@yourdomain.com",
+        to: user.email || "",
+        from: process.env.SENDGRID_FROM_EMAIL || "notifications@repairrequest.org",
         subject: "Password Reset Request",
-        text: `Hello,\n\nYou requested a password reset. If this was you, click the link below to reset your password. If not, you can ignore this email.\n\n[Reset Link Here]`,
-        html: `<p>Hello,</p><p>You requested a password reset. If this was you, click the link below to reset your password. If not, you can ignore this email.</p><p><a href='#'>Reset Password</a></p>`
+        text: `Hello ${user.firstName || 'User'},\n\nYou requested a password reset. If this was you, click the link below to reset your password. If not, you can ignore this email.\n\nReset Link: ${resetLink}\n\nThis link will expire in 1 hour.\n\nBest regards,\nRepairRequest Team`,
+        html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background-color: #0079F2; color: white; padding: 20px; text-align: center; }
+                .content { padding: 20px; background-color: #f9f9f9; }
+                .button { background-color: #0079F2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; margin: 20px 0; }
+                .footer { text-align: center; padding: 15px; color: #666; font-size: 12px; }
+                .warning { background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin: 10px 0; border-radius: 4px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h2>Password Reset Request</h2>
+                </div>
+                <div class="content">
+                    <p>Hello ${user.firstName || 'User'},</p>
+                    <p>You requested a password reset. If this was you, click the button below to reset your password. If not, you can ignore this email.</p>
+                    <a href="${resetLink}" class="button">Reset Password</a>
+                    <p>If the button doesn't work, copy and paste this link into your browser:</p>
+                    <p style="word-break: break-all; background: #f8f9fa; padding: 10px; border-radius: 4px;">${resetLink}</p>
+                    <div class="warning">
+                        <strong>⚠️ Security Notice:</strong> This link will expire in 1 hour for your security.
+                    </div>
+                </div>
+                <div class="footer">
+                    <p>Best regards,<br>RepairRequest Team</p>
+                </div>
+            </div>
+        </body>
+        </html>`
       });
 
       if (!emailSent) {
+        console.error('❌ Failed to send forgot password email to:', user.email);
         return res.status(500).json({ status: "error", error: { message: "Failed to send email" } });
       }
 
+      console.log('✅ Forgot password email sent successfully to:', user.email);
       return res.json({ status: "success", data: undefined });
     } catch (err) {
+      console.error('❌ Error in forgot password route:', err);
       return res.status(500).json({ status: "error", error: { message: "Internal server error" } });
+    }
+  });
+
+  // Reset password route
+  app.post("/api/reset-password", async (req, res) => {
+    const { token, email, newPassword } = req.body;
+    
+    if (!token || !email || !newPassword) {
+      return res.status(400).json({ 
+        status: "error", 
+        error: { message: "Token, email, and new password are required" } 
+      });
+    }
+
+    try {
+      console.log('=== RESET PASSWORD REQUEST ===');
+      console.log('Email:', email);
+      console.log('Token provided:', !!token);
+
+      const user = await dbStorage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ 
+          status: "error", 
+          error: { message: "User not found" } 
+        });
+      }
+
+      // Verify token
+      const isValidToken = await dbStorage.verifyResetToken(user.id, token);
+      if (!isValidToken) {
+        return res.status(400).json({ 
+          status: "error", 
+          error: { message: "Invalid or expired reset token" } 
+        });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update user password
+      await dbStorage.updateUserPassword(user.id, hashedPassword);
+
+      // Clear reset token
+      await dbStorage.clearResetToken(user.id);
+
+      console.log('✅ Password reset successful for:', email);
+      return res.json({ 
+        status: "success", 
+        data: { message: "Password reset successfully" } 
+      });
+
+    } catch (err) {
+      console.error('❌ Error in reset password route:', err);
+      return res.status(500).json({ 
+        status: "error", 
+        error: { message: "Internal server error" } 
+      });
     }
   });
 
