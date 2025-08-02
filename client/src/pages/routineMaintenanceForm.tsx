@@ -44,7 +44,7 @@ export default function RoutineMaintenanceForm() {
 
   // Check if user has admin/maintenance permissions
   useEffect(() => {
-    if (!isLoading && user && !["admin", "super_admin", "maintenance", "requester"].includes(user.role)) {
+    if (!isLoading && user && !["admin", "super_admin", "maintenance"].includes(user.role)) {
       toast({
         title: "Access Denied",
         description: "Only admin and maintenance users can create routine maintenance tasks.",

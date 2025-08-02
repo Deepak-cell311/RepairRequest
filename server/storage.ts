@@ -575,14 +575,43 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getUserRequests(userId: string, limit: number): Promise<any[]> {
-    const requestList = await db
-      .select()
-      .from(requests)
-      .where(eq(requests.requestorId, userId))
-      .orderBy(desc(requests.createdAt))
-      .limit(limit);
-    
-    return requestList;
+    try {
+      // Get regular requests
+      const regularRequests = await db
+        .select()
+        .from(requests)
+        .where(eq(requests.requestorId, userId))
+        .orderBy(desc(requests.createdAt))
+        .limit(limit);
+
+      // Get routine maintenance tasks created by user
+      const routineMaintenance = await db
+        .select({
+          id: routineMaintenance.id,
+          requestType: sql`'routine_maintenance'`,
+          facility: routineMaintenance.facility,
+          event: routineMaintenance.event,
+          eventDate: routineMaintenance.dateBegun,
+          status: sql`'active'`,
+          priority: sql`'medium'`,
+          createdAt: routineMaintenance.createdAt,
+          updatedAt: routineMaintenance.updatedAt,
+          requestorId: routineMaintenance.createdById,
+          photoUrl: sql`null`,
+          organizationId: routineMaintenance.organizationId,
+        })
+        .from(routineMaintenance)
+        .where(eq(routineMaintenance.createdById, userId))
+        .orderBy(desc(routineMaintenance.createdAt))
+        .limit(limit);
+
+      // Combine and sort by creation date
+      const allRequests = [...regularRequests, ...routineMaintenance];
+      return allRequests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch (error) {
+      console.error("Error getting user requests:", error);
+      return [];
+    }
   }
   
   async getUserRequestsByStatus(userId: string, status?: string): Promise<any[]> {
@@ -639,8 +668,8 @@ export class DatabaseStorage implements IStorage {
   
   async getAllRequestsByStatus(status?: string, organizationId?: number): Promise<any[]> {
     try {
-      // First get the basic request data with requestors
-      let queryBuilder = db
+      // Get regular requests
+      let regularQueryBuilder = db
         .select({
           request: requests,
           requestor: users
@@ -648,34 +677,83 @@ export class DatabaseStorage implements IStorage {
         .from(requests)
         .leftJoin(users, eq(users.id, requests.requestorId));
       
-      // Build where conditions
-      const conditions = [];
+      // Build where conditions for regular requests
+      const regularConditions = [];
       if (status) {
-        conditions.push(eq(requests.status, status));
+        regularConditions.push(eq(requests.status, status));
       }
       if (organizationId) {
-        conditions.push(eq(requests.organizationId, organizationId));
+        regularConditions.push(eq(requests.organizationId, organizationId));
       }
       
-      if (conditions.length > 0) {
-        queryBuilder = queryBuilder.where(conditions.length === 1 ? conditions[0] : and(...conditions)) as any;
+      if (regularConditions.length > 0) {
+        regularQueryBuilder = regularQueryBuilder.where(regularConditions.length === 1 ? regularConditions[0] : and(...regularConditions)) as any;
       }
       
-      const results = await queryBuilder.orderBy(desc(requests.updatedAt));
+      const regularResults = await regularQueryBuilder.orderBy(desc(requests.updatedAt));
+      
+      // Get routine maintenance tasks
+      const routineTable = routineMaintenance;
+      let routineQueryBuilder = db
+        .select({
+          request: {
+            id: routineTable.id,
+            requestType: sql`'routine_maintenance'`,
+            facility: routineTable.facility,
+            event: routineTable.event,
+            eventDate: routineTable.dateBegun,
+            status: sql`'active'`,
+            priority: sql`'medium'`,
+            createdAt: routineTable.createdAt,
+            updatedAt: routineTable.updatedAt,
+            requestorId: routineTable.createdById,
+            photoUrl: sql`null`,
+            organizationId: routineTable.organizationId,
+          },
+          requestor: users
+        })
+        .from(routineTable)
+        .leftJoin(users, eq(users.id, routineTable.createdById));
+      
+      // Build where conditions for routine maintenance
+      const routineConditions = [];
+      if (organizationId) {
+        routineConditions.push(eq(routineTable.organizationId, organizationId));
+      }
+      
+      if (routineConditions.length > 0) {
+        routineQueryBuilder = routineQueryBuilder.where(routineConditions.length === 1 ? routineConditions[0] : and(...routineConditions)) as any;
+      }
+      
+      const routineResults = await routineQueryBuilder.orderBy(desc(routineTable.updatedAt));
+      
+      // Combine both results
+      const allResults = [...regularResults, ...routineResults];
       
       // For each request, get assignment data separately
       const enrichedRequests = await Promise.all(
-        results.map(async (item) => {
-          // Get assignment info if it exists
-          const assignmentData = await db
-            .select({
-              assignment: assignments,
-              assignee: users
-            })
-            .from(assignments)
-            .leftJoin(users, eq(users.id, assignments.assigneeId))
-            .where(eq(assignments.requestId, item.request.id))
-            .limit(1);
+        allResults.map(async (item) => {
+          // Get assignment info if it exists (only for regular requests)
+          let assigneeInfo = null;
+          if (item.request.requestType !== 'routine_maintenance') {
+            const assignmentData = await db
+              .select({
+                assignment: assignments,
+                assignee: users
+              })
+              .from(assignments)
+              .leftJoin(users, eq(users.id, assignments.assigneeId))
+              .where(eq(assignments.requestId, item.request.id))
+              .limit(1);
+              
+            assigneeInfo = assignmentData.length > 0 && assignmentData[0].assignee 
+              ? {
+                  id: assignmentData[0].assignee.id,
+                  name: `${assignmentData[0].assignee.firstName || ''} ${assignmentData[0].assignee.lastName || ''}`.trim(),
+                  profileImageUrl: assignmentData[0].assignee.profileImageUrl
+                } 
+              : null;
+          }
             
           // Format the requestor info
           const requestorInfo = item.requestor ? {
@@ -683,15 +761,6 @@ export class DatabaseStorage implements IStorage {
             name: `${item.requestor.firstName || ''} ${item.requestor.lastName || ''}`.trim(),
             email: item.requestor.email
           } : null;
-          
-          // Format the assignee info if available
-          const assigneeInfo = assignmentData.length > 0 && assignmentData[0].assignee 
-            ? {
-                id: assignmentData[0].assignee.id,
-                name: `${assignmentData[0].assignee.firstName || ''} ${assignmentData[0].assignee.lastName || ''}`.trim(),
-                profileImageUrl: assignmentData[0].assignee.profileImageUrl
-              } 
-            : null;
             
           return {
             ...item.request,
@@ -701,7 +770,8 @@ export class DatabaseStorage implements IStorage {
         })
       );
       
-      return enrichedRequests;
+      // Sort by updated date
+      return enrichedRequests.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
     } catch (error) {
       console.error("Error fetching all requests by status:", error);
       return [];

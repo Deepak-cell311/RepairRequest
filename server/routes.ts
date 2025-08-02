@@ -229,7 +229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
  
 
-  app.get("/api/routine-maintenance", async (req, res) => {
+  app.get("/api/routine-maintenance", authMiddleware, async (req, res) => {
     try {
       const { user } = req as any;
       if (!user) {
@@ -255,7 +255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/routine-maintenance/:id", async (req, res) => {
+  app.get("/api/routine-maintenance/:id", authMiddleware, async (req, res) => {
     try {
       const { id } = req.params;
       const { user } = req as any;
@@ -1256,8 +1256,8 @@ app.get(
     res.json({ message: "Server is working", timestamp: new Date().toISOString() });
   });
 
-   // Routine Maintenance API Routes
-   app.post("/api/routine-maintenance", upload.array('photos', 5), async (req, res) => {
+     // Routine Maintenance API Routes
+  app.post("/api/routine-maintenance", authMiddleware, upload.array('photos', 5), async (req, res) => {
     try {
       console.log('=== ROUTINE MAINTENANCE SUBMIT ===');
       
@@ -1270,12 +1270,21 @@ app.get(
       }
 
       // Check if user has permission
+      console.log('=== USER ROLE DEBUG ===');
+      console.log('User object:', user);
+      console.log('User role:', user.role);
+      console.log('Allowed roles:', ["admin", "super_admin", "maintenance"]);
+      console.log('Role check result:', ["admin", "super_admin", "maintenance"].includes(user.role));
+      
       if (!["admin", "super_admin", "maintenance"].includes(user.role)) {
+        console.log('❌ Permission denied for role:', user.role);
         return res.status(403).json({ 
           status: "error", 
           error: { message: "Only admin and maintenance users can create routine maintenance tasks" } 
         });
       }
+      
+      console.log('✅ Permission granted for role:', user.role);
 
       const {
         facility,

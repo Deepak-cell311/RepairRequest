@@ -52,7 +52,6 @@ export default function Sidebar({ isMobileOpen, closeMobileSidebar, user }: Side
     { href: "/dashboard", label: "Dashboard", icon: "dashboard", access: "all" },
     { href: "/new-building-request", label: "New Repair Request", icon: "home_repair_service", access: "all" },
     { href: "/new-facilities-request", label: "New Labor Request", icon: "event_seat", access: "all" },
-    { href: "/routine-maintenance", label: "Routine Maintenance", icon: "schedule", access: "all" },
     { href: "/my-requests", label: "My Requests", icon: "assignment", access: "all" },
     { href: "/room-history", label: "Room History", icon: "history", access: "all" },
   ];
