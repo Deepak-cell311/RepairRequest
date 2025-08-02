@@ -10,6 +10,9 @@ import {
   organizations,
   buildings,
   facilities,
+  passwordResetTokens,
+  routineMaintenance,
+  routineMaintenancePhotos,
   type User,
   type UpsertUser,
   type InsertRequest,
@@ -32,6 +35,10 @@ import {
   type InsertBuilding,
   type Facility,
   type InsertFacility,
+  type InsertRoutineMaintenance,
+  type RoutineMaintenance,
+  type InsertRoutineMaintenancePhoto,
+  type RoutineMaintenancePhoto,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, count, sql, or, isNull, asc } from "drizzle-orm";
@@ -140,6 +147,21 @@ export interface IStorage {
   // Email notifications
   getOrganizationAdminEmails(organizationId: number): Promise<string[]>;
   
+  // Password reset operations
+  storeResetToken(userId: string, token: string, expiresAt: Date): Promise<void>;
+  verifyResetToken(userId: string, token: string): Promise<boolean>;
+  clearResetToken(userId: string): Promise<void>;
+  updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
+  
+  // Routine maintenance operations
+  createRoutineMaintenance(maintenanceData: InsertRoutineMaintenance): Promise<RoutineMaintenance>;
+  getRoutineMaintenance(id: number): Promise<RoutineMaintenance | undefined>;
+  getAllRoutineMaintenance(organizationId: number): Promise<RoutineMaintenance[]>;
+  updateRoutineMaintenance(id: number, updates: Partial<InsertRoutineMaintenance>): Promise<RoutineMaintenance>;
+  deleteRoutineMaintenance(id: number): Promise<void>;
+  saveRoutineMaintenancePhoto(photoData: InsertRoutineMaintenancePhoto & { fileBuffer?: Buffer }): Promise<RoutineMaintenancePhoto>;
+  getRoutineMaintenancePhotos(maintenanceId: number): Promise<RoutineMaintenancePhoto[]>;
+ 
 
 }
 
@@ -553,14 +575,43 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getUserRequests(userId: string, limit: number): Promise<any[]> {
-    const requestList = await db
-      .select()
-      .from(requests)
-      .where(eq(requests.requestorId, userId))
-      .orderBy(desc(requests.createdAt))
-      .limit(limit);
-    
-    return requestList;
+    try {
+      // Get regular requests
+      const regularRequests = await db
+        .select()
+        .from(requests)
+        .where(eq(requests.requestorId, userId))
+        .orderBy(desc(requests.createdAt))
+        .limit(limit);
+
+      // Get routine maintenance tasks created by user
+      const routineMaintenance = await db
+        .select({
+          id: routineMaintenance.id,
+          requestType: sql`'routine_maintenance'`,
+          facility: routineMaintenance.facility,
+          event: routineMaintenance.event,
+          eventDate: routineMaintenance.dateBegun,
+          status: sql`'active'`,
+          priority: sql`'medium'`,
+          createdAt: routineMaintenance.createdAt,
+          updatedAt: routineMaintenance.updatedAt,
+          requestorId: routineMaintenance.createdById,
+          photoUrl: sql`null`,
+          organizationId: routineMaintenance.organizationId,
+        })
+        .from(routineMaintenance)
+        .where(eq(routineMaintenance.createdById, userId))
+        .orderBy(desc(routineMaintenance.createdAt))
+        .limit(limit);
+
+      // Combine and sort by creation date
+      const allRequests = [...regularRequests, ...routineMaintenance];
+      return allRequests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch (error) {
+      console.error("Error getting user requests:", error);
+      return [];
+    }
   }
   
   async getUserRequestsByStatus(userId: string, status?: string): Promise<any[]> {
@@ -617,8 +668,8 @@ export class DatabaseStorage implements IStorage {
   
   async getAllRequestsByStatus(status?: string, organizationId?: number): Promise<any[]> {
     try {
-      // First get the basic request data with requestors
-      let queryBuilder = db
+      // Get regular requests
+      let regularQueryBuilder = db
         .select({
           request: requests,
           requestor: users
@@ -626,34 +677,83 @@ export class DatabaseStorage implements IStorage {
         .from(requests)
         .leftJoin(users, eq(users.id, requests.requestorId));
       
-      // Build where conditions
-      const conditions = [];
+      // Build where conditions for regular requests
+      const regularConditions = [];
       if (status) {
-        conditions.push(eq(requests.status, status));
+        regularConditions.push(eq(requests.status, status));
       }
       if (organizationId) {
-        conditions.push(eq(requests.organizationId, organizationId));
+        regularConditions.push(eq(requests.organizationId, organizationId));
       }
       
-      if (conditions.length > 0) {
-        queryBuilder = queryBuilder.where(conditions.length === 1 ? conditions[0] : and(...conditions)) as any;
+      if (regularConditions.length > 0) {
+        regularQueryBuilder = regularQueryBuilder.where(regularConditions.length === 1 ? regularConditions[0] : and(...regularConditions)) as any;
       }
       
-      const results = await queryBuilder.orderBy(desc(requests.updatedAt));
+      const regularResults = await regularQueryBuilder.orderBy(desc(requests.updatedAt));
+      
+      // Get routine maintenance tasks
+      const routineTable = routineMaintenance;
+      let routineQueryBuilder = db
+        .select({
+          request: {
+            id: routineTable.id,
+            requestType: sql`'routine_maintenance'`,
+            facility: routineTable.facility,
+            event: routineTable.event,
+            eventDate: routineTable.dateBegun,
+            status: sql`'active'`,
+            priority: sql`'medium'`,
+            createdAt: routineTable.createdAt,
+            updatedAt: routineTable.updatedAt,
+            requestorId: routineTable.createdById,
+            photoUrl: sql`null`,
+            organizationId: routineTable.organizationId,
+          },
+          requestor: users
+        })
+        .from(routineTable)
+        .leftJoin(users, eq(users.id, routineTable.createdById));
+      
+      // Build where conditions for routine maintenance
+      const routineConditions = [];
+      if (organizationId) {
+        routineConditions.push(eq(routineTable.organizationId, organizationId));
+      }
+      
+      if (routineConditions.length > 0) {
+        routineQueryBuilder = routineQueryBuilder.where(routineConditions.length === 1 ? routineConditions[0] : and(...routineConditions)) as any;
+      }
+      
+      const routineResults = await routineQueryBuilder.orderBy(desc(routineTable.updatedAt));
+      
+      // Combine both results
+      const allResults = [...regularResults, ...routineResults];
       
       // For each request, get assignment data separately
       const enrichedRequests = await Promise.all(
-        results.map(async (item) => {
-          // Get assignment info if it exists
-          const assignmentData = await db
-            .select({
-              assignment: assignments,
-              assignee: users
-            })
-            .from(assignments)
-            .leftJoin(users, eq(users.id, assignments.assigneeId))
-            .where(eq(assignments.requestId, item.request.id))
-            .limit(1);
+        allResults.map(async (item) => {
+          // Get assignment info if it exists (only for regular requests)
+          let assigneeInfo = null;
+          if (item.request.requestType !== 'routine_maintenance') {
+            const assignmentData = await db
+              .select({
+                assignment: assignments,
+                assignee: users
+              })
+              .from(assignments)
+              .leftJoin(users, eq(users.id, assignments.assigneeId))
+              .where(eq(assignments.requestId, item.request.id))
+              .limit(1);
+              
+            assigneeInfo = assignmentData.length > 0 && assignmentData[0].assignee 
+              ? {
+                  id: assignmentData[0].assignee.id,
+                  name: `${assignmentData[0].assignee.firstName || ''} ${assignmentData[0].assignee.lastName || ''}`.trim(),
+                  profileImageUrl: assignmentData[0].assignee.profileImageUrl
+                } 
+              : null;
+          }
             
           // Format the requestor info
           const requestorInfo = item.requestor ? {
@@ -661,15 +761,6 @@ export class DatabaseStorage implements IStorage {
             name: `${item.requestor.firstName || ''} ${item.requestor.lastName || ''}`.trim(),
             email: item.requestor.email
           } : null;
-          
-          // Format the assignee info if available
-          const assigneeInfo = assignmentData.length > 0 && assignmentData[0].assignee 
-            ? {
-                id: assignmentData[0].assignee.id,
-                name: `${assignmentData[0].assignee.firstName || ''} ${assignmentData[0].assignee.lastName || ''}`.trim(),
-                profileImageUrl: assignmentData[0].assignee.profileImageUrl
-              } 
-            : null;
             
           return {
             ...item.request,
@@ -679,7 +770,8 @@ export class DatabaseStorage implements IStorage {
         })
       );
       
-      return enrichedRequests;
+      // Sort by updated date
+      return enrichedRequests.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
     } catch (error) {
       console.error("Error fetching all requests by status:", error);
       return [];
@@ -1211,6 +1303,200 @@ export class DatabaseStorage implements IStorage {
       return emails;
     } catch (error) {
       console.error("Error getting organization admin emails:", error);
+      return [];
+    }
+  }
+
+  // Password reset operations
+  async storeResetToken(userId: string, token: string, expiresAt: Date): Promise<void> {
+    try {
+      // Clear any existing tokens for this user
+      await db
+        .delete(passwordResetTokens)
+        .where(eq(passwordResetTokens.userId, userId));
+
+      // Insert new token
+      await db.insert(passwordResetTokens).values({
+        userId,
+        token,
+        expiresAt,
+        used: false,
+      });
+      
+      console.log(`Reset token stored for user: ${userId}`);
+    } catch (error) {
+      console.error("Error storing reset token:", error);
+      throw error;
+    }
+  }
+
+  async verifyResetToken(userId: string, token: string): Promise<boolean> {
+    try {
+      const resetToken = await db
+        .select()
+        .from(passwordResetTokens)
+        .where(
+          and(
+            eq(passwordResetTokens.userId, userId),
+            eq(passwordResetTokens.token, token),
+            eq(passwordResetTokens.used, false),
+            sql`${passwordResetTokens.expiresAt} > NOW()`
+          )
+        )
+        .limit(1);
+
+      const isValid = resetToken.length > 0;
+      console.log(`Token verification for user ${userId}: ${isValid ? 'valid' : 'invalid'}`);
+      return isValid;
+    } catch (error) {
+      console.error("Error verifying reset token:", error);
+      return false;
+    }
+  }
+
+  async clearResetToken(userId: string): Promise<void> {
+    try {
+      await db
+        .update(passwordResetTokens)
+        .set({ used: true })
+        .where(eq(passwordResetTokens.userId, userId));
+      
+      console.log(`Reset token cleared for user: ${userId}`);
+    } catch (error) {
+      console.error("Error clearing reset token:", error);
+      throw error;
+    }
+  }
+
+  async updateUserPassword(userId: string, hashedPassword: string): Promise<void> {
+    try {
+      await db
+        .update(users)
+        .set({ password: hashedPassword })
+        .where(eq(users.id, userId));
+      
+      console.log(`Password updated for user: ${userId}`);
+    } catch (error) {
+      console.error("Error updating user password:", error);
+      throw error;
+    }
+  }
+
+  // Routine maintenance operations
+  async createRoutineMaintenance(maintenanceData: InsertRoutineMaintenance): Promise<RoutineMaintenance> {
+    try {
+      const [result] = await db.insert(routineMaintenance).values(maintenanceData).returning();
+      console.log(`Routine maintenance created with ID: ${result.id}`);
+      return result;
+    } catch (error) {
+      console.error("Error creating routine maintenance:", error);
+      throw error;
+    }
+  }
+
+  async getRoutineMaintenance(id: number): Promise<RoutineMaintenance | undefined> {
+    try {
+      const [result] = await db
+        .select()
+        .from(routineMaintenance)
+        .where(eq(routineMaintenance.id, id));
+      
+      return result;
+    } catch (error) {
+      console.error("Error getting routine maintenance:", error);
+      return undefined;
+    }
+  }
+
+  async getAllRoutineMaintenance(organizationId: number): Promise<RoutineMaintenance[]> {
+    try {
+      return await db
+        .select()
+        .from(routineMaintenance)
+        .where(eq(routineMaintenance.organizationId, organizationId))
+        .orderBy(desc(routineMaintenance.createdAt));
+    } catch (error) {
+      console.error("Error getting all routine maintenance:", error);
+      return [];
+    }
+  }
+
+  async updateRoutineMaintenance(id: number, updates: Partial<InsertRoutineMaintenance>): Promise<RoutineMaintenance> {
+    try {
+      const [result] = await db
+        .update(routineMaintenance)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(routineMaintenance.id, id))
+        .returning();
+      
+      console.log(`Routine maintenance updated with ID: ${id}`);
+      return result;
+    } catch (error) {
+      console.error("Error updating routine maintenance:", error);
+      throw error;
+    }
+  }
+
+  async deleteRoutineMaintenance(id: number): Promise<void> {
+    try {
+      await db.delete(routineMaintenance).where(eq(routineMaintenance.id, id));
+      console.log(`Routine maintenance deleted with ID: ${id}`);
+    } catch (error) {
+      console.error("Error deleting routine maintenance:", error);
+      throw error;
+    }
+  }
+
+  async saveRoutineMaintenancePhoto(photoData: InsertRoutineMaintenancePhoto & { fileBuffer?: Buffer }): Promise<RoutineMaintenancePhoto> {
+    try {
+      const { fileBuffer, ...dbData } = photoData;
+      
+      if (fileBuffer) {
+        // Generate unique filename
+        const timestamp = Date.now();
+        const randomId = Math.floor(Math.random() * 1000000);
+        const extension = photoData.originalFilename?.split('.').pop() || 'jpg';
+        const filename = `routine-maintenance-${timestamp}-${randomId}.${extension}`;
+        
+        // Upload to S3 if configured, otherwise save locally
+        let photoUrl;
+        if (S3_BUCKET) {
+          const key = `routine-maintenance-photos/${filename}`;
+          photoUrl = await uploadFileToS3(key, fileBuffer, photoData.mimeType || 'image/jpeg');
+        } else {
+          // Save locally
+          const uploadDir = path.join(process.cwd(), 'uploads', 'photos');
+          if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+          }
+          
+          const filePath = path.join(uploadDir, filename);
+          fs.writeFileSync(filePath, fileBuffer);
+          photoUrl = `/uploads/photos/${filename}`;
+        }
+        
+        dbData.photoUrl = photoUrl;
+        dbData.filename = filename;
+      }
+      
+      const [result] = await db.insert(routineMaintenancePhotos).values(dbData).returning();
+      console.log(`Routine maintenance photo saved with ID: ${result.id}`);
+      return result;
+    } catch (error) {
+      console.error("Error saving routine maintenance photo:", error);
+      throw error;
+    }
+  }
+
+  async getRoutineMaintenancePhotos(maintenanceId: number): Promise<RoutineMaintenancePhoto[]> {
+    try {
+      return await db
+        .select()
+        .from(routineMaintenancePhotos)
+        .where(eq(routineMaintenancePhotos.routineMaintenanceId, maintenanceId))
+        .orderBy(asc(routineMaintenancePhotos.uploadedAt));
+    } catch (error) {
+      console.error("Error getting routine maintenance photos:", error);
       return [];
     }
   }

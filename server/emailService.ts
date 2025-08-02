@@ -21,6 +21,11 @@ interface EmailParams {
 }
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
+  if (!mailService) {
+    console.error('SendGrid mail service is not initialized');
+    return false;
+  }
+  
   try {
     console.log('Attempting to send email:', {
       to: params.to,
@@ -67,6 +72,10 @@ async function sendTemplatedEmails(
   requesterTemplateId: string,
   adminTemplateId: string
 ): Promise<void> {
+  if (!mailService) {
+    throw new Error('SendGrid mail service is not initialized');
+  }
+
   console.log('Using SendGrid dynamic templates');
   console.log('Requester template:', requesterTemplateId);
   console.log('Admin template:', adminTemplateId);
@@ -96,10 +105,12 @@ async function sendTemplatedEmails(
       : requestData.location
   };
 
+  console.log('Template data being sent:', JSON.stringify(templateData, null, 2));
+
   try {
     // Send email to requester using template
     console.log('Sending templated requester notification...');
-    await mailService.send({
+    const requesterResponse = await mailService.send({
       to: requestData.requesterEmail,
       from: fromEmail,
       templateId: requesterTemplateId,
@@ -110,20 +121,59 @@ async function sendTemplatedEmails(
     // Send emails to admins using template
     console.log('Sending templated admin notifications...');
     for (const adminEmail of adminEmails) {
-      await mailService.send({
-        to: adminEmail,
-        from: fromEmail,
-        templateId: adminTemplateId,
-        dynamicTemplateData: templateData
-      });
+      try {
+        console.log(`Attempting to send admin notification to: ${adminEmail}`);
+        const adminResponse = await mailService.send({
+          to: adminEmail,
+          from: fromEmail,
+          templateId: adminTemplateId,
+          dynamicTemplateData: templateData
+        });
+        console.log(`✅ Admin notification sent successfully to ${adminEmail}`);
+        console.log(`Response status: ${adminResponse[0].statusCode}`);
+        
+        // Log response headers for debugging
+        if (adminResponse[0].headers) {
+          console.log(`Response headers for ${adminEmail}:`, adminResponse[0].headers);
+        }
+      } catch (adminError) {
+        console.error(`❌ Failed to send admin notification to ${adminEmail}:`, adminError);
+        
+        // Log detailed error information
+        if (adminError && typeof adminError === 'object' && 'response' in adminError) {
+          const apiError = adminError as any;
+          console.error(`SendGrid API Response for ${adminEmail}:`, {
+            status: apiError.response?.status,
+            statusText: apiError.response?.statusText,
+            body: apiError.response?.body
+          });
+        }
+        
+        // Continue with other admin emails even if one fails
+        console.log(`Continuing with remaining admin emails...`);
+      }
     }
-    console.log('Admin notifications sent successfully');
+    console.log('Admin notifications processing completed');
 
     console.log(`Templated notification emails sent for request #${requestData.requestId}`);
   } catch (error) {
     console.error('Failed to send templated emails:', error);
     console.error('Template data used:', JSON.stringify(templateData, null, 2));
-    throw error;
+    
+    // Log more detailed error information
+    if (error && typeof error === 'object' && 'response' in error) {
+      const apiError = error as any;
+      console.error('SendGrid API Response:', {
+        status: apiError.response?.status,
+        statusText: apiError.response?.statusText,
+        headers: apiError.response?.headers,
+        body: apiError.response?.body
+      });
+    }
+    
+    // If template sending fails, fall back to inline HTML
+    console.log('Falling back to inline HTML emails due to template failure...');
+    throw new Error(`Template email failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please check SendGrid configuration.`);
   }
 }
 
@@ -136,16 +186,32 @@ export async function sendRequestNotificationEmails(
   console.log('Admin emails:', adminEmails);
   console.log('SendGrid API key exists:', !!process.env.SENDGRID_API_KEY);
   
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'notifications@SchoolHouselogistics.com';
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'notifications@repairrequest.org';
   
-  // SendGrid template IDs - configure these in your SendGrid account
-  const REQUESTER_TEMPLATE_ID = process.env.SENDGRID_REQUESTER_TEMPLATE_ID || 'd-2da91c2d43c54e968dba7e20f8f30d27';
-  const ADMIN_TEMPLATE_ID = process.env.SENDGRID_ADMIN_TEMPLATE_ID || 'd-350141c85514463b885f6fcf3f4a44f9';
+  // SendGrid template IDs from environment variables
+  const REQUESTER_TEMPLATE_ID = process.env.SENDGRID_REQUESTER_TEMPLATE_ID;
+  const ADMIN_TEMPLATE_ID = process.env.SENDGRID_ADMIN_TEMPLATE_ID;
   
-  // Use templates if configured, otherwise fall back to inline HTML
+  // Try templates first, then fall back to inline HTML
+  console.log('Attempting to use SendGrid templates...');
+  
   if (REQUESTER_TEMPLATE_ID && ADMIN_TEMPLATE_ID) {
-    return sendTemplatedEmails(requestData, adminEmails, fromEmail, REQUESTER_TEMPLATE_ID, ADMIN_TEMPLATE_ID);
+    try {
+      console.log('Using template IDs from environment variables:');
+      console.log('Requester template:', REQUESTER_TEMPLATE_ID);
+      console.log('Admin template:', ADMIN_TEMPLATE_ID);
+      
+      await sendTemplatedEmails(requestData, adminEmails, fromEmail, REQUESTER_TEMPLATE_ID, ADMIN_TEMPLATE_ID);
+      console.log('✅ Templated emails sent successfully');
+      return;
+    } catch (templateError) {
+      console.error('❌ Template email failed, falling back to inline HTML:', templateError);
+      // Continue to inline HTML fallback
+    }
   }
+  
+  // Fallback to inline HTML emails
+  console.log('Using inline HTML email fallback...');
   
   // Email template for new request notification
   const generateEmailContent = (isForRequester: boolean) => {
@@ -244,30 +310,59 @@ ${requestData.organizationName} Maintenance Team`;
 
   try {
     // Send email to requester
+    console.log('Sending requester notification...');
     const requesterEmail = generateEmailContent(true);
-    await sendEmail({
+    const requesterSuccess = await sendEmail({
       to: requestData.requesterEmail,
       from: fromEmail,
       subject: requesterEmail.subject,
       text: requesterEmail.text,
       html: requesterEmail.html,
     });
-
-    // Send email to all admins
-    const adminEmail = generateEmailContent(false);
-    for (const adminEmailAddress of adminEmails) {
-      await sendEmail({
-        to: adminEmailAddress,
-        from: fromEmail,
-        subject: adminEmail.subject,
-        text: adminEmail.text,
-        html: adminEmail.html,
-      });
+    
+    if (requesterSuccess) {
+      console.log(`✅ Requester notification sent to ${requestData.requesterEmail}`);
+    } else {
+      console.error(`❌ Failed to send requester notification to ${requestData.requesterEmail}`);
     }
 
-    console.log(`Request notification emails sent for request #${requestData.requestId}`);
+    // Send email to all admins with detailed logging
+    console.log('Sending admin notifications...');
+    const adminEmail = generateEmailContent(false);
+    let adminSuccessCount = 0;
+    
+    for (const adminEmailAddress of adminEmails) {
+      try {
+        console.log(`Attempting to send admin notification to: ${adminEmailAddress}`);
+        const adminSuccess = await sendEmail({
+          to: adminEmailAddress,
+          from: fromEmail,
+          subject: adminEmail.subject,
+          text: adminEmail.text,
+          html: adminEmail.html,
+        });
+        
+        if (adminSuccess) {
+          console.log(`✅ Admin notification sent successfully to ${adminEmailAddress}`);
+          adminSuccessCount++;
+        } else {
+          console.error(`❌ Failed to send admin notification to ${adminEmailAddress}`);
+        }
+      } catch (adminError) {
+        console.error(`❌ Error sending admin notification to ${adminEmailAddress}:`, adminError);
+      }
+    }
+
+    console.log(`📧 Email Summary for Request #${requestData.requestId}:`);
+    console.log(`   - Requester: ${requesterSuccess ? '✅ Sent' : '❌ Failed'}`);
+    console.log(`   - Admins: ${adminSuccessCount}/${adminEmails.length} sent successfully`);
+    
+    if (adminSuccessCount === 0 && adminEmails.length > 0) {
+      console.error('⚠️ WARNING: No admin emails were sent successfully!');
+    }
+    
   } catch (error) {
-    console.error('Error sending request notification emails:', error);
+    console.error('❌ Error sending request notification emails:', error);
     throw error;
   }
 }

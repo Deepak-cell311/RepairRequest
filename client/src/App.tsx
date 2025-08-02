@@ -34,6 +34,8 @@ import SignupPage from "./pages/SignupPage";
 import LoginPage from "./pages/LoginPage";
 import { BrowserRouter, Outlet, Route, Routes, useParams } from "react-router-dom";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPassword from "./pages/ResetPassword";
+import RoutineMaintenanceForm from "./pages/routineMaintenanceForm";
 import AuthRedirect from "./pages/auth-redirect";
 
 function RequestDetailWrapper() {
@@ -108,6 +110,8 @@ function AppContent() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        
 
         {/* Protected routes */}
         {isAuthenticated && (
@@ -115,6 +119,7 @@ function AppContent() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/new-facilities-request" element={<RequestForm />} />
             <Route path="/new-building-request" element={<BuildingRequestForm />} />
+            <Route path="/routine-maintenance" element={<RoutineMaintenanceForm />} />
             <Route path="/requests/:id" element={<RequestDetailWrapper />} />
             <Route path="/my-requests" element={<MyRequests />} />
             <Route path="/assigned-requests" element={<AssignedRequests />} />

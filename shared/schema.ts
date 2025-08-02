@@ -199,6 +199,50 @@ export const contactMessages = pgTable("contact_messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Password reset tokens table
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: varchar("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Routine maintenance table
+export const routineMaintenance = pgTable("routine_maintenance", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  facility: varchar("facility").notNull(), // Building name
+  event: varchar("event").notNull(), // Maintenance title
+  dateBegun: date("date_begun").notNull(),
+  recurrence: varchar("recurrence").notNull(), // daily, weekly, bi-weekly, monthly, quarterly, bi-annually, annually, custom
+  customRecurrence: text("custom_recurrence"),
+  roomNumber: varchar("room_number").notNull(),
+  description: text("description").notNull(),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  isActive: boolean("is_active").default(true),
+  lastPerformed: timestamp("last_performed"),
+  nextDue: timestamp("next_due"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Routine maintenance photos table
+export const routineMaintenancePhotos = pgTable("routine_maintenance_photos", {
+  id: serial("id").primaryKey(),
+  routineMaintenanceId: integer("routine_maintenance_id").notNull().references(() => routineMaintenance.id, { onDelete: "cascade" }),
+  photoUrl: varchar("photo_url", { length: 2000 }).notNull(),
+  filename: varchar("filename", { length: 500 }).notNull(),
+  originalFilename: varchar("original_filename", { length: 500 }),
+  filePath: varchar("file_path", { length: 2000 }),
+  mimeType: varchar("mime_type", { length: 100 }),
+  size: integer("size"),
+  caption: text("caption"),
+  uploadedById: varchar("uploaded_by_id").notNull().references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
 
 
 // Schemas for zod validation
@@ -258,6 +302,19 @@ export const insertContactMessageSchema = createInsertSchema(contactMessages).om
   createdAt: true,
 });
 
+export const insertRoutineMaintenanceSchema = createInsertSchema(routineMaintenance).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastPerformed: true,
+  nextDue: true,
+});
+
+export const insertRoutineMaintenancePhotoSchema = createInsertSchema(routineMaintenancePhotos).omit({
+  id: true,
+  uploadedAt: true,
+});
+
 
 // Add organization and building schema types
 export const insertOrganizationSchema = createInsertSchema(organizations).omit({
@@ -314,6 +371,12 @@ export type RequestPhoto = typeof requestPhotos.$inferSelect;
 
 export type InsertContactMessage = z.infer<typeof insertContactMessageSchema>;
 export type ContactMessage = typeof contactMessages.$inferSelect;
+
+export type InsertRoutineMaintenance = z.infer<typeof insertRoutineMaintenanceSchema>;
+export type RoutineMaintenance = typeof routineMaintenance.$inferSelect;
+
+export type InsertRoutineMaintenancePhoto = z.infer<typeof insertRoutineMaintenancePhotoSchema>;
+export type RoutineMaintenancePhoto = typeof routineMaintenancePhotos.$inferSelect;
 
 
 

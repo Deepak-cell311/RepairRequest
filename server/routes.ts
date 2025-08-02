@@ -89,8 +89,6 @@ const s3 = new AWS.S3();
 export async function registerRoutes(app: Express): Promise<Server> {
 
   // Forgot password endpoint
-
-
   app.post("/api/forgot-password", async (req, res) => {
     const { email } = req.body;
     if (!email) {
@@ -102,22 +100,196 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ status: "error", error: { message: "User not found" } });
       }
 
+      console.log('=== FORGOT PASSWORD EMAIL REQUEST ===');
+      console.log('User email:', user.email);
+      console.log('SendGrid API key exists:', !!process.env.SENDGRID_API_KEY);
+      console.log('From email:', process.env.SENDGRID_FROM_EMAIL || "notifications@repairrequest.org");
+
+      // Generate reset token and link
+      const resetToken = crypto.randomUUID();
+      const resetLink = `${process.env.VITE_API_URL || 'http://localhost:5001'}/reset-password?token=${resetToken}&email=${encodeURIComponent(user.email)}`;
+      
+      // Store reset token in database
+      await dbStorage.storeResetToken(user.id, resetToken, new Date(Date.now() + 3600000)); // 1 hour expiry
+      
+      console.log('Reset link generated:', resetLink);
+
       // Actually send the email
       const emailSent = await sendEmail({
-        to: user.email,
-        from: process.env.SENDGRID_FROM_EMAIL || "no-reply@yourdomain.com",
+        to: user.email || "",
+        from: process.env.SENDGRID_FROM_EMAIL || "notifications@repairrequest.org",
         subject: "Password Reset Request",
-        text: `Hello,\n\nYou requested a password reset. If this was you, click the link below to reset your password. If not, you can ignore this email.\n\n[Reset Link Here]`,
-        html: `<p>Hello,</p><p>You requested a password reset. If this was you, click the link below to reset your password. If not, you can ignore this email.</p><p><a href='#'>Reset Password</a></p>`
+        text: `Hello ${user.firstName || 'User'},\n\nYou requested a password reset. If this was you, click the link below to reset your password. If not, you can ignore this email.\n\nReset Link: ${resetLink}\n\nThis link will expire in 1 hour.\n\nBest regards,\nRepairRequest Team`,
+        html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background-color: #0079F2; color: white; padding: 20px; text-align: center; }
+                .content { padding: 20px; background-color: #f9f9f9; }
+                .button { background-color: #0079F2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; margin: 20px 0; }
+                .footer { text-align: center; padding: 15px; color: #666; font-size: 12px; }
+                .warning { background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin: 10px 0; border-radius: 4px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h2>Password Reset Request</h2>
+                </div>
+                <div class="content">
+                    <p>Hello ${user.firstName || 'User'},</p>
+                    <p>You requested a password reset. If this was you, click the button below to reset your password. If not, you can ignore this email.</p>
+                    <a href="${resetLink}" class="button">Reset Password</a>
+                    <p>If the button doesn't work, copy and paste this link into your browser:</p>
+                    <p style="word-break: break-all; background: #f8f9fa; padding: 10px; border-radius: 4px;">${resetLink}</p>
+                    <div class="warning">
+                        <strong>⚠️ Security Notice:</strong> This link will expire in 1 hour for your security.
+                    </div>
+                </div>
+                <div class="footer">
+                    <p>Best regards,<br>RepairRequest Team</p>
+                </div>
+            </div>
+        </body>
+        </html>`
       });
 
       if (!emailSent) {
+        console.error('❌ Failed to send forgot password email to:', user.email);
         return res.status(500).json({ status: "error", error: { message: "Failed to send email" } });
       }
 
+      console.log('✅ Forgot password email sent successfully to:', user.email);
       return res.json({ status: "success", data: undefined });
     } catch (err) {
+      console.error('❌ Error in forgot password route:', err);
       return res.status(500).json({ status: "error", error: { message: "Internal server error" } });
+    }
+  });
+
+  // Reset password route
+  app.post("/api/reset-password", async (req, res) => {
+    const { token, email, newPassword } = req.body;
+    
+    if (!token || !email || !newPassword) {
+      return res.status(400).json({ 
+        status: "error", 
+        error: { message: "Token, email, and new password are required" } 
+      });
+    }
+
+    try {
+      console.log('=== RESET PASSWORD REQUEST ===');
+      console.log('Email:', email);
+      console.log('Token provided:', !!token);
+
+      const user = await dbStorage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ 
+          status: "error", 
+          error: { message: "User not found" } 
+        });
+      }
+
+      // Verify token
+      const isValidToken = await dbStorage.verifyResetToken(user.id, token);
+      if (!isValidToken) {
+        return res.status(400).json({ 
+          status: "error", 
+          error: { message: "Invalid or expired reset token" } 
+        });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update user password
+      await dbStorage.updateUserPassword(user.id, hashedPassword);
+
+      // Clear reset token
+      await dbStorage.clearResetToken(user.id);
+
+      console.log('✅ Password reset successful for:', email);
+      return res.json({ 
+        status: "success", 
+        data: { message: "Password reset successfully" } 
+      });
+
+    } catch (err) {
+      console.error('❌ Error in reset password route:', err);
+      return res.status(500).json({ 
+        status: "error", 
+        error: { message: "Internal server error" } 
+      });
+    }
+  });
+
+ 
+
+  app.get("/api/routine-maintenance", authMiddleware, async (req, res) => {
+    try {
+      const { user } = req as any;
+      if (!user) {
+        return res.status(401).json({ 
+          status: "error", 
+          error: { message: "Authentication required" } 
+        });
+      }
+
+      const maintenance = await dbStorage.getAllRoutineMaintenance(user.organizationId);
+      
+      return res.json({ 
+        status: "success", 
+        data: maintenance 
+      });
+
+    } catch (error) {
+      console.error('❌ Error getting routine maintenance:', error);
+      return res.status(500).json({ 
+        status: "error", 
+        error: { message: "Failed to get routine maintenance tasks" } 
+      });
+    }
+  });
+
+  app.get("/api/routine-maintenance/:id", authMiddleware, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { user } = req as any;
+      
+      if (!user) {
+        return res.status(401).json({ 
+          status: "error", 
+          error: { message: "Authentication required" } 
+        });
+      }
+
+      const maintenance = await dbStorage.getRoutineMaintenance(parseInt(id));
+      
+      if (!maintenance) {
+        return res.status(404).json({ 
+          status: "error", 
+          error: { message: "Routine maintenance task not found" } 
+        });
+      }
+
+      // Get photos for this maintenance task
+      const photos = await dbStorage.getRoutineMaintenancePhotos(parseInt(id));
+
+      return res.json({ 
+        status: "success", 
+        data: { ...maintenance, photos } 
+      });
+
+    } catch (error) {
+      console.error('❌ Error getting routine maintenance details:', error);
+      return res.status(500).json({ 
+        status: "error", 
+        error: { message: "Failed to get routine maintenance details" } 
+      });
     }
   });
 
@@ -533,7 +705,7 @@ app.get(
       try {
         createdRequest = await dbStorage.createRequest(requestData);
         console.log("Request created successfully:", createdRequest);
-      } catch (dbError) {
+      } catch (dbError: any) {
         console.error("Database creation error:", dbError);
         return res.status(500).json({
           message: "Database error during request creation",
@@ -1082,6 +1254,127 @@ app.get(
   // Simple test endpoint
   app.get("/api/test-simple", (req, res) => {
     res.json({ message: "Server is working", timestamp: new Date().toISOString() });
+  });
+
+     // Routine Maintenance API Routes
+  app.post("/api/routine-maintenance", authMiddleware, upload.array('photos', 5), async (req, res) => {
+    try {
+      console.log('=== ROUTINE MAINTENANCE SUBMIT ===');
+      
+      const { user } = req as any;
+      if (!user) {
+        return res.status(401).json({ 
+          status: "error", 
+          error: { message: "Authentication required" } 
+        });
+      }
+
+      // Check if user has permission
+      console.log('=== USER ROLE DEBUG ===');
+      console.log('User object:', user);
+      console.log('User role:', user.role);
+      console.log('Allowed roles:', ["admin", "super_admin", "maintenance"]);
+      console.log('Role check result:', ["admin", "super_admin", "maintenance"].includes(user.role));
+      
+      if (!["admin", "super_admin", "maintenance"].includes(user.role)) {
+        console.log('❌ Permission denied for role:', user.role);
+        return res.status(403).json({ 
+          status: "error", 
+          error: { message: "Only admin and maintenance users can create routine maintenance tasks" } 
+        });
+      }
+      
+      console.log('✅ Permission granted for role:', user.role);
+
+      const {
+        facility,
+        event,
+        dateBegun,
+        recurrence,
+        customRecurrence,
+        'maintenance.roomNumber': roomNumber,
+        'maintenance.description': description,
+      } = req.body;
+
+      console.log('Form data received:', {
+        facility,
+        event,
+        dateBegun,
+        recurrence,
+        customRecurrence,
+        roomNumber,
+        description,
+        photosCount: req.files?.length || 0
+      });
+
+      // Validate required fields
+      if (!facility || !event || !dateBegun || !recurrence || !roomNumber || !description) {
+        return res.status(400).json({ 
+          status: "error", 
+          error: { message: "All required fields must be provided" } 
+        });
+      }
+
+      // Create routine maintenance record
+      const maintenanceData = {
+        organizationId: user.organizationId,
+        facility,
+        event,
+        dateBegun: new Date(dateBegun),
+        recurrence,
+        customRecurrence: customRecurrence || null,
+        roomNumber,
+        description,
+        createdById: user.id,
+      };
+
+      console.log('Creating routine maintenance with data:', maintenanceData);
+
+      const routineMaintenance = await dbStorage.createRoutineMaintenance(maintenanceData);
+      console.log('✅ Routine maintenance created with ID:', routineMaintenance.id);
+
+      // Handle photo uploads
+      if (req.files && req.files.length > 0) {
+        console.log(`Processing ${req.files.length} photos...`);
+        
+        for (const file of req.files as any[]) {
+          try {
+            const photoData = {
+              routineMaintenanceId: routineMaintenance.id,
+              photoUrl: '', // Will be set by storage function
+              filename: file.originalname,
+              originalFilename: file.originalname,
+              filePath: file.path,
+              mimeType: file.mimetype,
+              size: file.size,
+              uploadedById: user.id,
+              fileBuffer: file.buffer,
+            };
+
+            await dbStorage.saveRoutineMaintenancePhoto(photoData);
+            console.log(`✅ Photo saved for maintenance ID: ${routineMaintenance.id}`);
+          } catch (photoError) {
+            console.error('❌ Error saving photo:', photoError);
+            // Continue with other photos even if one fails
+          }
+        }
+      }
+
+      return res.json({ 
+        status: "success", 
+        data: { 
+          id: routineMaintenance.id,
+          message: "Routine maintenance task created successfully" 
+        } 
+      });
+
+    } catch (error) {
+      console.error('❌ Error in routine maintenance route:', error);
+      return res.status(500).json({ 
+        status: "error", 
+        error: { message: "Failed to create routine maintenance task" } 
+      });
+    }
   });
 
   // Test upload endpoint for debugging (no auth for testing)
