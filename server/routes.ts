@@ -533,7 +533,7 @@ app.get(
       try {
         createdRequest = await dbStorage.createRequest(requestData);
         console.log("Request created successfully:", createdRequest);
-      } catch (dbError) {
+      } catch (dbError: any) {
         console.error("Database creation error:", dbError);
         return res.status(500).json({
           message: "Database error during request creation",
