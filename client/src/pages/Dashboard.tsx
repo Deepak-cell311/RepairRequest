@@ -4,7 +4,9 @@ import { useAuth } from "@/hooks/useAuth";
 import StatsCard from "@/components/dashboard/StatsCard";
 import RequestCard from "@/components/requests/RequestCard";
 import { format } from "date-fns";
-
+import { Badge } from "@/components/ui/badge";
+import { Calendar, Building } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 
 export default function Dashboard() {
@@ -34,8 +36,14 @@ export default function Dashboard() {
     queryKey: ["/api/buildings"],
   });
 
+  // Fetch routine maintenance tasks
+  const { data: routineMaintenance, isLoading: isLoadingRoutine } = useQuery({
+    queryKey: ["/api/routine-maintenance"],
+  });
+
   console.log("Response of organizations: ", organizations)
   console.log("Response of buildings: ", buildings)
+  console.log("Response of routine maintenance: ", routineMaintenance)
 
   // Type assertions for API responses
   const stats = statsData as any;
@@ -43,6 +51,7 @@ export default function Dashboard() {
   const assigned = assignedRequests as any[];
   const orgs = organizations as any[];
   const userBuildings = buildings as any[];
+  const routineTasks = routineMaintenance?.data as any[] || [];
   
   return (
     <div className="py-6">
@@ -352,7 +361,7 @@ export default function Dashboard() {
         </div>
 
         {/* Buildings Section - Only show if user has an organization */}
-        {/* {orgs && orgs.length > 0 && (
+        {orgs && orgs.length > 0 && (
           <div className="mt-8">
             <h2 className="text-lg font-heading font-medium text-gray-900">Buildings</h2>
             <div className="mt-4">
@@ -399,7 +408,70 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-        )} */}
+        )}
+
+        {/* Routine Maintenance Section - Only show if user has an organization */}
+        {orgs && orgs.length > 0 && (
+          <div className="mt-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-heading font-medium text-gray-900">Scheduled Maintenance</h2>
+              <Link to="/routine-maintenance-list" className="text-sm text-primary hover:text-primary-light font-medium">
+                View all
+              </Link>
+            </div>
+            <div className="mt-4">
+              {isLoadingRoutine ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Loading scheduled tasks...</p>
+                </div>
+              ) : routineTasks && routineTasks.length > 0 ? (
+                <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                  {routineTasks.slice(0, 3).map((task: any) => (
+                    <div key={task.id} className="bg-white rounded-lg shadow p-6">
+                      <div className="flex justify-between items-start mb-3">
+                        <h3 className="font-medium text-gray-900">{task.facility}</h3>
+                        <Badge variant="outline" className="text-xs">
+                          {task.recurrence}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-3">{task.event}</p>
+                      <div className="space-y-2 text-sm text-gray-500">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          <span>Started: {format(new Date(task.dateBegun), 'MMM dd, yyyy')}</span>
+                        </div>
+                        {task.roomNumber && (
+                          <div className="flex items-center gap-2">
+                            <Building className="h-4 w-4" />
+                            <span>Room: {task.roomNumber}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-4 pt-3 border-t">
+                        <Link to={`/routine-maintenance-list`}>
+                          <Button variant="outline" size="sm" className="w-full">
+                            View Details
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No scheduled maintenance tasks found.</p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    {(user?.role === 'admin' || user?.role === 'maintenance') && (
+                      <Link to="/routine-maintenance" className="text-primary hover:text-primary-light">
+                        Create a scheduled task
+                      </Link>
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -36,6 +36,8 @@ import { BrowserRouter, Outlet, Route, Routes, useParams } from "react-router-do
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPassword from "./pages/ResetPassword";
 import RoutineMaintenanceForm from "./pages/routineMaintenanceForm";
+import RoutineMaintenanceList from "./pages/RoutineMaintenanceList";
+import RoutineMaintenanceDetail from "./pages/RoutineMaintenanceDetail";
 import AuthRedirect from "./pages/auth-redirect";
 
 function RequestDetailWrapper() {
@@ -120,6 +122,8 @@ function AppContent() {
             <Route path="/new-facilities-request" element={<RequestForm />} />
             <Route path="/new-building-request" element={<BuildingRequestForm />} />
             <Route path="/routine-maintenance" element={<RoutineMaintenanceForm />} />
+            <Route path="/routine-maintenance-list" element={<RoutineMaintenanceList />} />
+            <Route path="/routine-maintenance/:id" element={<RoutineMaintenanceDetail />} />
             <Route path="/requests/:id" element={<RequestDetailWrapper />} />
             <Route path="/my-requests" element={<MyRequests />} />
             <Route path="/assigned-requests" element={<AssignedRequests />} />

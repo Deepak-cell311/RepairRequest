@@ -239,6 +239,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // If user has no organization, return empty array
+      if (!user.organizationId) {
+        return res.json({
+          status: "success",
+          data: []
+        });
+      }
+
       const maintenance = await dbStorage.getAllRoutineMaintenance(user.organizationId);
 
       return res.json({
@@ -279,9 +287,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get photos for this maintenance task
       const photos = await dbStorage.getRoutineMaintenancePhotos(parseInt(id));
 
+      // Get creator information
+      const creator = await dbStorage.getUser(maintenance.createdById);
+
       return res.json({
         status: "success",
-        data: { ...maintenance, photos }
+        data: { 
+          ...maintenance, 
+          photos,
+          createdBy: creator ? {
+            firstName: creator.firstName,
+            lastName: creator.lastName,
+            email: creator.email
+          } : null
+        }
       });
 
     } catch (error) {
@@ -1064,8 +1083,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: req.body.name,
         address: req.body.address,
         description: req.body.description,
-        room_numbers: updateRoomNumbers, // Always an array
+        roomNumbers: updateRoomNumbers, // Always an array, camelCase for Drizzle
       };
+      console.log("Updating building with:", updates);
 
       const building = await dbStorage.updateBuilding(buildingId, updates);
       // Map DB result to ensure roomNumbers is always an array
@@ -2299,7 +2319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Map DB result to ensure roomNumbers is always an array
       const result = {
         ...building,
-        roomNumbers: building.roomNumbers ?? [],
+        roomNumbers: building.room_numbers ?? [],
       };
       res.json(result);
     } catch (error) {
@@ -2330,8 +2350,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: req.body.name,
         address: req.body.address,
         description: req.body.description,
-        room_numbers: updateRoomNumbers, // Always an array
+        roomNumbers: updateRoomNumbers, // Always an array, camelCase for Drizzle
       };
+      console.log("Updating building with:", updates);
 
       const building = await dbStorage.updateBuilding(buildingId, updates);
       // Map DB result to ensure roomNumbers is always an array
@@ -3256,7 +3277,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // CRITICAL: Add critical admin routes first to avoid Vite conflicts
+  // Manual trigger for routine maintenance scheduler (super admin only)
+  app.post("/api/admin/routine-maintenance/trigger", authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await dbStorage.getUser(userId);
+
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: "Super admin access required" });
+      }
+
+      // Import and run the scheduler
+      const { RoutineMaintenanceScheduler } = await import('./routineMaintenanceScheduler');
+      await RoutineMaintenanceScheduler.checkAndCreateTickets();
+
+      res.json({ 
+        message: "Routine maintenance scheduler executed successfully",
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error triggering routine maintenance scheduler:", error);
+      res.status(500).json({ message: "Failed to trigger scheduler" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
