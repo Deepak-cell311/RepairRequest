@@ -96,7 +96,7 @@ export default function Support() {
       {/* Support Options */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
             
             <Card className="text-center">
               <CardHeader>
@@ -122,7 +122,7 @@ export default function Support() {
               </CardContent>
             </Card>
 
-            <Card className="text-center">
+            {/* <Card className="text-center">
               <CardHeader>
                 <MessageCircle className="h-12 w-12 mx-auto text-purple-600 mb-4" />
                 <CardTitle>Live Chat</CardTitle>
@@ -132,7 +132,7 @@ export default function Support() {
                 <p className="font-semibold">Available in portal</p>
                 <p className="text-sm text-gray-500">Mon-Fri, 8AM-8PM EST</p>
               </CardContent>
-            </Card>
+            </Card> */}
 
             <Card className="text-center">
               <CardHeader>
@@ -291,7 +291,7 @@ export default function Support() {
               <ul className="space-y-2 text-gray-400">
                 <li><Link to="/about" className="hover:text-white transition-colors">About</Link></li>
                 <li><Link to="/contact" className="hover:text-white transition-colors">Contact</Link></li>
-                <li><Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link></li>
+                <li><Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
                 <li><Link to="/terms" className="hover:text-white transition-colors">Terms</Link></li>
               </ul>
             </div>

@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Mail, Lock, Eye, EyeOff, User } from "lucide-react"
 import { useState } from "react"
+import { useAuth } from "@/hooks/useAuth"
+import { useQueryClient } from "@tanstack/react-query"
 
 export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -18,8 +20,10 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+ 
 
   const navigate = useNavigate();
+  const queryClient = useQueryClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,27 +55,39 @@ export default function SignupPage() {
 
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/signup`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json"},
         body: JSON.stringify({ email, password, firstName, lastName }),
+        credentials: "include" // send cookie with request
       });
-
       const data = await res.json();
-      console.log("🔁 Server Response: ", data);
+      console.log("Server Response: ", data);
 
+      console.log("SignUp data: ", res)
       if (!res.ok) {
-        console.error("❌ Signup Error:", data);
+        console.error("Signup Error:", data);
         setError(data.message || "Signup failed");
       } else {
-        console.log("✅ Signup successful");
+        console.log("Signup successful");
         setSuccess("Signup successful! You can now log in.");
         setFullName("");
         setEmail("");
         setPassword("");
         setConfirmPassword("");
-        navigate("/login");
+
+        await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+         // Role-based navigation
+         if (data.user.role === "admin") {
+          navigate("/dashboard");
+        } else if (data.user.role === "maintenance") {
+          navigate("/assigned-requests");
+        } else {
+          navigate("/dashboard"); // requester or default
+        }
+        
+        // navigate("/login");
       }
     } catch (err: any) {
-      console.error("🔥 Network/Unexpected Error:", err);
+      console.error("Network/Unexpected Error:", err);
       setError("Signup failed. Please try again.");
     } finally {
       setLoading(false);

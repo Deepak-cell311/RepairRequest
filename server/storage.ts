@@ -73,6 +73,7 @@ export interface IStorage {
   // Organization operations
   createOrganization(orgData: InsertOrganization): Promise<Organization>;
   getOrganization(id: number): Promise<Organization | undefined>;
+  getOrganizationById(id: number): Promise<Organization | undefined>;
   getOrganizationBySlug(slug: string): Promise<Organization | undefined>;
   getOrganizationByDomain(domain: string): Promise<Organization | undefined>;
   updateOrganization(id: number, updates: Partial<InsertOrganization>): Promise<Organization>;
@@ -173,6 +174,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getOrganization(id: number): Promise<Organization | undefined> {
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, id));
+    return org;
+  }
+
+  async getOrganizationById(id: number): Promise<Organization | undefined> {
     const [org] = await db.select().from(organizations).where(eq(organizations.id, id));
     return org;
   }
