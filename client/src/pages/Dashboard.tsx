@@ -361,7 +361,7 @@ export default function Dashboard() {
         </div>
 
         {/* Buildings Section - Only show if user has an organization */}
-        {orgs && orgs.length > 0 && (
+        {/* {orgs && orgs.length > 0 && (
           <div className="mt-8">
             <h2 className="text-lg font-heading font-medium text-gray-900">Buildings</h2>
             <div className="mt-4">
@@ -408,10 +408,10 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Routine Maintenance Section - Only show if user has an organization */}
-        {orgs && orgs.length > 0 && (
+        {/* {orgs && orgs.length > 0 && (
           <div className="mt-8">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-heading font-medium text-gray-900">Scheduled Maintenance</h2>
@@ -471,7 +471,7 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );
