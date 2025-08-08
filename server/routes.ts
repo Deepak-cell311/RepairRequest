@@ -3085,17 +3085,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get all admin and super_admin users
-      const adminUsers = await dbStorage.getAllUsers();
-      const adminEmails = adminUsers
-        .filter(user => user.role === 'admin' || user.role === 'super_admin')
-        .map(user => user.email);
-
-      if (adminEmails.length === 0) {
-        return res.status(500).json({ 
-          message: "No admin users found to receive contact form submissions" 
-        });
-      }
+      // Email will be sent to info@schoolhouselogistics.com
 
       // Send email to all admins
       const emailContent = `
@@ -3111,18 +3101,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         ---
         This message was sent from the RepairRequest contact form.
+        Reply to: ${email}
       `;
 
-      // Send to each admin
-      for (const adminEmail of adminEmails) {
-        await sendEmail({
-          to: adminEmail,
-          from: process.env.FROM_EMAIL || 'noreply@repairrequest.com',
-          subject: `Contact Form: ${subject}`,
-          text: emailContent,
-          html: emailContent.replace(/\n/g, '<br>')
-        });
-      }
+      // Send confirmation email to the user
+      const confirmationEmailContent = `
+        Dear ${firstName} ${lastName},
+        
+        Thank you for contacting RepairRequest support!
+        
+        We have received your message and will get back to you as soon as possible.
+        
+        Your message details:
+        Subject: ${subject}
+        Message: ${message}
+        
+        If you have any urgent questions, please call us at 407-494-5230.
+        
+        Best regards,
+        The RepairRequest Team
+        SchoolHouse Logistics
+      `;
+
+      // Send confirmation email to the user
+      await sendEmail({
+        to: email, // Send to user's email
+        from: process.env.SENDGRID_FROM_EMAIL || 'notifications@repairrequest.org',
+        subject: 'Thank you for contacting RepairRequest Support',
+        text: confirmationEmailContent,
+        html: confirmationEmailContent.replace(/\n/g, '<br>')
+      });
+
+      // Send notification email to info@schoolhouselogistics.com
+      await sendEmail({
+        to: 'info@schoolhouselogistics.com',
+        from: process.env.SENDGRID_FROM_EMAIL || 'notifications@repairrequest.org',
+        subject: `New Contact Form Submission from ${firstName} ${lastName}: ${subject}`,
+        text: emailContent,
+        html: emailContent.replace(/\n/g, '<br>')
+      });
 
       res.json({ 
         message: "Your message has been sent successfully. We'll get back to you soon." 
