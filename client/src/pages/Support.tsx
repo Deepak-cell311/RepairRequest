@@ -6,9 +6,75 @@ import { Label } from "@/components/ui/label";
 import { Mail, Phone, Clock, MessageCircle, Menu } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Support() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    organization: "",
+    subject: "",
+    message: ""
+  });
+  const { toast } = useToast();
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Message Sent!",
+          description: result.message,
+        });
+        // Reset form
+        setFormData({
+          firstName: "",
+          lastName: "",
+          email: "",
+          organization: "",
+          subject: "",
+          message: ""
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to send message. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -96,7 +162,7 @@ export default function Support() {
       {/* Support Options */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
             
             <Card className="text-center">
               <CardHeader>
@@ -122,7 +188,7 @@ export default function Support() {
               </CardContent>
             </Card>
 
-            <Card className="text-center">
+            {/* <Card className="text-center">
               <CardHeader>
                 <MessageCircle className="h-12 w-12 mx-auto text-purple-600 mb-4" />
                 <CardTitle>Live Chat</CardTitle>
@@ -132,7 +198,7 @@ export default function Support() {
                 <p className="font-semibold">Available in portal</p>
                 <p className="text-sm text-gray-500">Mon-Fri, 8AM-8PM EST</p>
               </CardContent>
-            </Card>
+            </Card> */}
 
             <Card className="text-center">
               <CardHeader>
@@ -157,39 +223,78 @@ export default function Support() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="firstName">First Name</Label>
-                      <Input id="firstName" placeholder="John" />
+                      <Input 
+                        id="firstName" 
+                        name="firstName"
+                        value={formData.firstName}
+                        onChange={handleInputChange}
+                        placeholder="John" 
+                        required
+                      />
                     </div>
                     <div>
                       <Label htmlFor="lastName">Last Name</Label>
-                      <Input id="lastName" placeholder="Doe" />
+                      <Input 
+                        id="lastName" 
+                        name="lastName"
+                        value={formData.lastName}
+                        onChange={handleInputChange}
+                        placeholder="Doe" 
+                        required
+                      />
                     </div>
                   </div>
                   <div>
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" placeholder="john@example.com" />
+                    <Input 
+                      id="email" 
+                      name="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      placeholder="john@example.com" 
+                      required
+                    />
                   </div>
                   <div>
                     <Label htmlFor="organization">Organization</Label>
-                    <Input id="organization" placeholder="Your organization name" />
+                    <Input 
+                      id="organization" 
+                      name="organization"
+                      value={formData.organization}
+                      onChange={handleInputChange}
+                      placeholder="Your organization name" 
+                    />
                   </div>
                   <div>
                     <Label htmlFor="subject">Subject</Label>
-                    <Input id="subject" placeholder="How can we help?" />
+                    <Input 
+                      id="subject" 
+                      name="subject"
+                      value={formData.subject}
+                      onChange={handleInputChange}
+                      placeholder="How can we help?" 
+                      required
+                    />
                   </div>
                   <div>
                     <Label htmlFor="message">Message</Label>
                     <Textarea 
                       id="message" 
+                      name="message"
+                      value={formData.message}
+                      onChange={handleInputChange}
                       placeholder="Please describe your question or issue in detail..."
                       rows={5}
+                      required
                     />
                   </div>
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700">
-                    Send Message
+                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
+                    {isSubmitting ? "Sending..." : "Send Message"}
                   </Button>
                 </form>
               </CardContent>
@@ -291,7 +396,7 @@ export default function Support() {
               <ul className="space-y-2 text-gray-400">
                 <li><Link to="/about" className="hover:text-white transition-colors">About</Link></li>
                 <li><Link to="/contact" className="hover:text-white transition-colors">Contact</Link></li>
-                <li><Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link></li>
+                <li><Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
                 <li><Link to="/terms" className="hover:text-white transition-colors">Terms</Link></li>
               </ul>
             </div>

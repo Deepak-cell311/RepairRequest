@@ -4,7 +4,9 @@ import { useAuth } from "@/hooks/useAuth";
 import StatsCard from "@/components/dashboard/StatsCard";
 import RequestCard from "@/components/requests/RequestCard";
 import { format } from "date-fns";
-
+import { Badge } from "@/components/ui/badge";
+import { Calendar, Building } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 
 export default function Dashboard() {
@@ -29,6 +31,28 @@ export default function Dashboard() {
     queryKey: ["/api/admin/organizations"],
   });
   
+  // Fetch buildings for user's organization
+  const { data: buildings, isLoading: isLoadingBuildings } = useQuery({
+    queryKey: ["/api/buildings"],
+  });
+
+  // Fetch routine maintenance tasks
+  const { data: routineMaintenance, isLoading: isLoadingRoutine } = useQuery({
+    queryKey: ["/api/routine-maintenance"],
+  });
+
+  console.log("Response of organizations: ", organizations)
+  console.log("Response of buildings: ", buildings)
+  console.log("Response of routine maintenance: ", routineMaintenance)
+
+  // Type assertions for API responses
+  const stats = statsData as any;
+  const requests = recentRequests as any[];
+  const assigned = assignedRequests as any[];
+  const orgs = organizations as any[];
+  const userBuildings = buildings as any[];
+  const routineTasks = routineMaintenance?.data as any[] || [];
+  
   return (
     <div className="py-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
@@ -48,22 +72,22 @@ export default function Dashboard() {
               <>
                 <StatsCard 
                   title="Total Requests" 
-                  value={statsData?.total || 0} 
+                  value={stats?.total || 0} 
                   className="bg-white" 
                 />
                 <StatsCard 
                   title="Pending" 
-                  value={statsData?.pending || 0} 
+                  value={stats?.pending || 0} 
                   className="bg-white text-status-pending" 
                 />
                 <StatsCard 
                   title="In Progress" 
-                  value={statsData?.inProgress || 0} 
+                  value={stats?.inProgress || 0} 
                   className="bg-white text-status-inprogress" 
                 />
                 <StatsCard 
                   title="Completed" 
-                  value={statsData?.completed || 0} 
+                  value={stats?.completed || 0} 
                   className="bg-white text-status-completed" 
                 />
               </>
@@ -88,9 +112,9 @@ export default function Dashboard() {
                     <div key={i} className="animate-pulse h-20 bg-gray-100 rounded"></div>
                   ))}
                 </div>
-              ) : assignedRequests && assignedRequests.length > 0 ? (
+              ) : assigned && assigned.length > 0 ? (
                 <ul className="divide-y divide-gray-200">
-                  {assignedRequests.slice(0, 3).map((request: any) => (
+                  {assigned.slice(0, 3).map((request: any) => (
                     <RequestCard key={request.id} request={request} />
                   ))}
                 </ul>
@@ -242,7 +266,7 @@ export default function Dashboard() {
                     ))}
                   </div>
                 ) : (() => {
-                    const openRequests = recentRequests?.filter((request: any) => 
+                    const openRequests = requests?.filter((request: any) => 
                       ['pending', 'approved', 'in-progress'].includes(request.status)
                     ) || [];
                     
@@ -278,7 +302,7 @@ export default function Dashboard() {
                     ))}
                   </div>
                 ) : (() => {
-                    const completedRequests = recentRequests?.filter((request: any) => 
+                    const completedRequests = requests?.filter((request: any) => 
                       request.status === 'completed'
                     ) || [];
                     
@@ -305,8 +329,8 @@ export default function Dashboard() {
           <div className="mt-4 grid gap-6 grid-cols-1 md:grid-cols-2">
             {isLoadingOrgs ? (
               <div>Loading...</div>
-            ) : organizations && organizations.length > 0 ? (
-              organizations.map((org: any) => (
+            ) : orgs && orgs.length > 0 ? (
+              orgs.map((org: any) => (
                 <div key={org.id} className="relative rounded-lg overflow-hidden h-48 shadow-md flex gap-2">
                   {org.image1Url && (
                     <img
@@ -328,10 +352,126 @@ export default function Dashboard() {
                 </div>
               ))
             ) : (
-              <div>No organizations found</div>
+              <div className="col-span-2 text-center py-8">
+                <p className="text-gray-500">No organization assigned to your account yet.</p>
+                <p className="text-sm text-gray-400 mt-2">Please contact your administrator to get assigned to an organization.</p>
+              </div>
             )}
           </div>
         </div>
+
+        {/* Buildings Section - Only show if user has an organization */}
+        {orgs && orgs.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-lg font-heading font-medium text-gray-900">Buildings</h2>
+            <div className="mt-4">
+              {isLoadingBuildings ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Loading buildings...</p>
+                </div>
+              ) : userBuildings && userBuildings.length > 0 ? (
+                <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                  {userBuildings.map((building: any) => (
+                    <div key={building.id} className="bg-white rounded-lg shadow p-6">
+                      <h3 className="font-medium text-gray-900 mb-2">{building.name}</h3>
+                      {building.address && (
+                        <p className="text-sm text-gray-600 mb-2">{building.address}</p>
+                      )}
+                      {building.description && (
+                        <p className="text-sm text-gray-500 mb-3">{building.description}</p>
+                      )}
+                      {building.roomNumbers && building.roomNumbers.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-2">Rooms:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {building.roomNumbers.slice(0, 5).map((room: string, index: number) => (
+                              <span key={index} className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
+                                {room}
+                              </span>
+                            ))}
+                            {building.roomNumbers.length > 5 && (
+                              <span className="inline-block bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded">
+                                +{building.roomNumbers.length - 5} more
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No buildings configured for your organization yet.</p>
+                  <p className="text-sm text-gray-400 mt-2">Contact your administrator to add buildings.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Routine Maintenance Section - Only show if user has an organization */}
+        {orgs && orgs.length > 0 && (
+          <div className="mt-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-heading font-medium text-gray-900">Scheduled Maintenance</h2>
+              <Link to="/routine-maintenance-list" className="text-sm text-primary hover:text-primary-light font-medium">
+                View all
+              </Link>
+            </div>
+            <div className="mt-4">
+              {isLoadingRoutine ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Loading scheduled tasks...</p>
+                </div>
+              ) : routineTasks && routineTasks.length > 0 ? (
+                <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                  {routineTasks.slice(0, 3).map((task: any) => (
+                    <div key={task.id} className="bg-white rounded-lg shadow p-6">
+                      <div className="flex justify-between items-start mb-3">
+                        <h3 className="font-medium text-gray-900">{task.facility}</h3>
+                        <Badge variant="outline" className="text-xs">
+                          {task.recurrence}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-3">{task.event}</p>
+                      <div className="space-y-2 text-sm text-gray-500">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          <span>Started: {format(new Date(task.dateBegun), 'MMM dd, yyyy')}</span>
+                        </div>
+                        {task.roomNumber && (
+                          <div className="flex items-center gap-2">
+                            <Building className="h-4 w-4" />
+                            <span>Room: {task.roomNumber}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-4 pt-3 border-t">
+                        <Link to={`/routine-maintenance-list`}>
+                          <Button variant="outline" size="sm" className="w-full">
+                            View Details
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No scheduled maintenance tasks found.</p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    {(user?.role === 'admin' || user?.role === 'maintenance') && (
+                      <Link to="/routine-maintenance" className="text-primary hover:text-primary-light">
+                        Create a scheduled task
+                      </Link>
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

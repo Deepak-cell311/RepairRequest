@@ -35,7 +35,7 @@ export default function Sidebar({ isMobileOpen, closeMobileSidebar, user }: Side
     { href: "/room-history", label: "Room History", icon: "history", access: "admin" },
     { href: "/new-building-request", label: "New Repair Request", icon: "home_repair_service", access: "admin" },
     { href: "/new-facilities-request", label: "New Labor Request", icon: "event_seat", access: "admin" },
-    { href: "/routine-maintenance", label: "Routine Maintenance", icon: "schedule", access: "admin" },
+    { href: "/routine-maintenance-list", label: "Routine Maintenance", icon: "schedule", access: "admin" },
     { href: "/reports", label: "Reports", icon: "assessment", access: "admin" },
     { href: "/assigned-requests", label: "Assigned to Me", icon: "engineering", access: "admin" },
   ] : user?.role === 'maintenance' ? [
@@ -54,6 +54,7 @@ export default function Sidebar({ isMobileOpen, closeMobileSidebar, user }: Side
     { href: "/new-facilities-request", label: "New Labor Request", icon: "event_seat", access: "all" },
     { href: "/my-requests", label: "My Requests", icon: "assignment", access: "all" },
     { href: "/room-history", label: "Room History", icon: "history", access: "all" },
+    { href: "/routine-maintenance-list", label: "Routine Maintenance", icon: "schedule", access: "all" },
   ];
 
   return (

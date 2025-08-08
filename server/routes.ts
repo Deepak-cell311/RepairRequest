@@ -108,10 +108,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate reset token and link
       const resetToken = crypto.randomUUID();
       const resetLink = `${process.env.VITE_API_URL || 'http://localhost:5001'}/reset-password?token=${resetToken}&email=${encodeURIComponent(user.email)}`;
-      
+
       // Store reset token in database
       await dbStorage.storeResetToken(user.id, resetToken, new Date(Date.now() + 3600000)); // 1 hour expiry
-      
+
       console.log('Reset link generated:', resetLink);
 
       // Actually send the email
@@ -173,11 +173,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Reset password route
   app.post("/api/reset-password", async (req, res) => {
     const { token, email, newPassword } = req.body;
-    
+
     if (!token || !email || !newPassword) {
-      return res.status(400).json({ 
-        status: "error", 
-        error: { message: "Token, email, and new password are required" } 
+      return res.status(400).json({
+        status: "error",
+        error: { message: "Token, email, and new password are required" }
       });
     }
 
@@ -188,18 +188,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const user = await dbStorage.getUserByEmail(email);
       if (!user) {
-        return res.status(404).json({ 
-          status: "error", 
-          error: { message: "User not found" } 
+        return res.status(404).json({
+          status: "error",
+          error: { message: "User not found" }
         });
       }
 
       // Verify token
       const isValidToken = await dbStorage.verifyResetToken(user.id, token);
       if (!isValidToken) {
-        return res.status(400).json({ 
-          status: "error", 
-          error: { message: "Invalid or expired reset token" } 
+        return res.status(400).json({
+          status: "error",
+          error: { message: "Invalid or expired reset token" }
         });
       }
 
@@ -213,44 +213,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await dbStorage.clearResetToken(user.id);
 
       console.log('✅ Password reset successful for:', email);
-      return res.json({ 
-        status: "success", 
-        data: { message: "Password reset successfully" } 
+      return res.json({
+        status: "success",
+        data: { message: "Password reset successfully" }
       });
 
     } catch (err) {
       console.error('❌ Error in reset password route:', err);
-      return res.status(500).json({ 
-        status: "error", 
-        error: { message: "Internal server error" } 
+      return res.status(500).json({
+        status: "error",
+        error: { message: "Internal server error" }
       });
     }
   });
 
- 
+
 
   app.get("/api/routine-maintenance", authMiddleware, async (req, res) => {
     try {
       const { user } = req as any;
       if (!user) {
-        return res.status(401).json({ 
-          status: "error", 
-          error: { message: "Authentication required" } 
+        return res.status(401).json({
+          status: "error",
+          error: { message: "Authentication required" }
+        });
+      }
+
+      // If user has no organization, return empty array
+      if (!user.organizationId) {
+        return res.json({
+          status: "success",
+          data: []
         });
       }
 
       const maintenance = await dbStorage.getAllRoutineMaintenance(user.organizationId);
-      
-      return res.json({ 
-        status: "success", 
-        data: maintenance 
+
+      return res.json({
+        status: "success",
+        data: maintenance
       });
 
     } catch (error) {
       console.error('❌ Error getting routine maintenance:', error);
-      return res.status(500).json({ 
-        status: "error", 
-        error: { message: "Failed to get routine maintenance tasks" } 
+      return res.status(500).json({
+        status: "error",
+        error: { message: "Failed to get routine maintenance tasks" }
       });
     }
   });
@@ -259,36 +267,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { user } = req as any;
-      
+
       if (!user) {
-        return res.status(401).json({ 
-          status: "error", 
-          error: { message: "Authentication required" } 
+        return res.status(401).json({
+          status: "error",
+          error: { message: "Authentication required" }
         });
       }
 
       const maintenance = await dbStorage.getRoutineMaintenance(parseInt(id));
-      
+
       if (!maintenance) {
-        return res.status(404).json({ 
-          status: "error", 
-          error: { message: "Routine maintenance task not found" } 
+        return res.status(404).json({
+          status: "error",
+          error: { message: "Routine maintenance task not found" }
         });
       }
 
       // Get photos for this maintenance task
       const photos = await dbStorage.getRoutineMaintenancePhotos(parseInt(id));
 
-      return res.json({ 
-        status: "success", 
-        data: { ...maintenance, photos } 
+      // Get creator information
+      const creator = await dbStorage.getUser(maintenance.createdById);
+
+      return res.json({
+        status: "success",
+        data: { 
+          ...maintenance, 
+          photos,
+          createdBy: creator ? {
+            firstName: creator.firstName,
+            lastName: creator.lastName,
+            email: creator.email
+          } : null
+        }
       });
 
     } catch (error) {
       console.error('❌ Error getting routine maintenance details:', error);
-      return res.status(500).json({ 
-        status: "error", 
-        error: { message: "Failed to get routine maintenance details" } 
+      return res.status(500).json({
+        status: "error",
+        error: { message: "Failed to get routine maintenance details" }
       });
     }
   });
@@ -391,79 +410,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // } catch (error) {
   //   console.error("Failed to set up Google authentication:", error);
   // }
-// === GOOGLE OAUTH SETUP ===
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID!,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-  callbackURL: `${process.env.API_URL}/api/auth/google/callback`, 
-}, async (accessToken, refreshToken, profile, done) => {
-  try {
-    // Find or create user in DB
-    const email = profile.emails?.[0]?.value;
-    const firstName = profile.name?.givenName || "";
-    const lastName = profile.name?.familyName || "";
-    if (!email) return done(null, false, { message: "No email from Google" });
-    let user = await dbStorage.getUserByEmail(email);
-    if (!user) {
-      // Create user with default role requester
-      user = await dbStorage.upsertUser({
-        id: profile.id,
-        email,
-        firstName,
-        lastName,
-        password: null,
-        role: "requester",
-        organizationId: null,
-        profileImageUrl: profile.photos?.[0]?.value || null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
+  // === GOOGLE OAUTH SETUP ===
+  passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    callbackURL: `${process.env.API_URL}/api/auth/google/callback`,
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      // Find or create user in DB
+      const email = profile.emails?.[0]?.value;
+      const firstName = profile.name?.givenName || "";
+      const lastName = profile.name?.familyName || "";
+      if (!email) return done(null, false, { message: "No email from Google" });
+      let user = await dbStorage.getUserByEmail(email);
+      if (!user) {
+        // Create user with default role requester
+        user = await dbStorage.upsertUser({
+          id: profile.id,
+          email,
+          firstName,
+          lastName,
+          password: null,
+          role: "requester",
+          organizationId: null,
+          profileImageUrl: profile.photos?.[0]?.value || null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+      return done(null, user);
+    } catch (err) {
+      return done(err);
     }
-    return done(null, user);
-  } catch (err) {
-    return done(err);
-  }
-}));
+  }));
 
-passport.serializeUser((user, done) => {
-  done(null, user.id);
-});
-passport.deserializeUser(async (id, done) => {
-  try {
-    const user = await dbStorage.getUser(id);
-    done(null, user);
-  } catch (err) {
-    done(err);
-  }
-});
+  passport.serializeUser((user, done) => {
+    done(null, user.id);
+  });
+  passport.deserializeUser(async (id, done) => {
+    try {
+      const user = await dbStorage.getUser(id);
+      done(null, user);
+    } catch (err) {
+      done(err);
+    }
+  });
 
-app.use(passport.initialize());
-app.use(passport.session());
+  app.use(passport.initialize());
+  app.use(passport.session());
 
-// === GOOGLE OAUTH ROUTES ===
-app.get("/api/auth/google", passport.authenticate("google", { 
-  scope: ["profile", "email"],
-  prompt: "select_account"
-}));
+  // === GOOGLE OAUTH ROUTES ===
+  app.get("/api/auth/google", passport.authenticate("google", {
+    scope: ["profile", "email"],
+    prompt: "select_account"
+  }));
 
-app.get(
-  "/api/auth/google/callback",
-  passport.authenticate("google", { failureRedirect: "/login" }),
-  (req, res) => {
-    const user = req.user as any;
-    // Set session for user (same as normal login)
-    req.session.user = {
-      id: user.id,
-      email: user.email || '',
-      role: user.role,
-      firstName: user.firstName || '',
-      lastName: user.lastName || '',
-      organizationId: user.organizationId ?? undefined
-    };
-    const role = user.role || "requester";
-    res.redirect(`/auth-redirect?role=${role}`);
-  }
-);
+  app.get(
+    "/api/auth/google/callback",
+    passport.authenticate("google", { failureRedirect: "/login" }),
+    (req, res) => {
+      const user = req.user as any;
+      // Set session for user (same as normal login)
+      req.session.user = {
+        id: user.id,
+        email: user.email || '',
+        role: user.role,
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        organizationId: user.organizationId ?? null
+      };
+      const role = user.role || "requester";
+      res.redirect(`/auth-redirect?role=${role}`);
+    }
+  );
 
   // console.log('Google OAuth callback URL:', ${process.env.BASE_URL}/api/auth/google/callback);
   // PRIORITY OAUTH ROUTES: Register before all other middleware
@@ -935,7 +954,35 @@ app.get(
   app.get("/api/admin/organizations", async (req: any, res) => {
     try {
       console.log("Direct organizations route called");
-      const organizations = await dbStorage.getAllOrganizations();
+      console.log("User from session:", req.user);
+      console.log("User role:", req.user?.role);
+      console.log("User organizationId:", req.user?.organizationId);
+      
+      // Check if user is authenticated
+      if (!req.user) {
+        console.log("No user in session");
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      let organizations;
+      
+      // If user is super_admin, return all organizations
+      if (req.user.role === 'super_admin') {
+        console.log("User is super_admin, returning all organizations");
+        organizations = await dbStorage.getAllOrganizations();
+      } else {
+        // For other users, only return their assigned organization
+        if (!req.user.organizationId) {
+          console.log("User has no organizationId, returning empty array");
+          organizations = []; // No organization assigned
+        } else {
+          console.log("User has organizationId:", req.user.organizationId, "fetching organization");
+          const org = await dbStorage.getOrganizationById(req.user.organizationId);
+          console.log("Found organization:", org);
+          organizations = org ? [org] : [];
+        }
+      }
+      
       console.log("Direct route organizations:", organizations);
       res.setHeader('Content-Type', 'application/json');
       res.json(organizations);
@@ -1005,7 +1052,7 @@ app.get(
       // Map DB result to ensure roomNumbers is always an array
       const result = {
         ...building,
-        roomNumbers: building.roomNumbers ?? [],
+        roomNumbers: building.room_numbers ?? [],
       };
       res.json(result);
     } catch (error) {
@@ -1036,8 +1083,9 @@ app.get(
         name: req.body.name,
         address: req.body.address,
         description: req.body.description,
-        room_numbers: updateRoomNumbers, // Always an array
+        roomNumbers: updateRoomNumbers, // Always an array, camelCase for Drizzle
       };
+      console.log("Updating building with:", updates);
 
       const building = await dbStorage.updateBuilding(buildingId, updates);
       // Map DB result to ensure roomNumbers is always an array
@@ -1256,16 +1304,16 @@ app.get(
     res.json({ message: "Server is working", timestamp: new Date().toISOString() });
   });
 
-     // Routine Maintenance API Routes
+  // Routine Maintenance API Routes
   app.post("/api/routine-maintenance", authMiddleware, upload.array('photos', 5), async (req, res) => {
     try {
       console.log('=== ROUTINE MAINTENANCE SUBMIT ===');
-      
+
       const { user } = req as any;
       if (!user) {
-        return res.status(401).json({ 
-          status: "error", 
-          error: { message: "Authentication required" } 
+        return res.status(401).json({
+          status: "error",
+          error: { message: "Authentication required" }
         });
       }
 
@@ -1275,15 +1323,15 @@ app.get(
       console.log('User role:', user.role);
       console.log('Allowed roles:', ["admin", "super_admin", "maintenance"]);
       console.log('Role check result:', ["admin", "super_admin", "maintenance"].includes(user.role));
-      
+
       if (!["admin", "super_admin", "maintenance"].includes(user.role)) {
         console.log('❌ Permission denied for role:', user.role);
-        return res.status(403).json({ 
-          status: "error", 
-          error: { message: "Only admin and maintenance users can create routine maintenance tasks" } 
+        return res.status(403).json({
+          status: "error",
+          error: { message: "Only admin and maintenance users can create routine maintenance tasks" }
         });
       }
-      
+
       console.log('✅ Permission granted for role:', user.role);
 
       const {
@@ -1309,9 +1357,9 @@ app.get(
 
       // Validate required fields
       if (!facility || !event || !dateBegun || !recurrence || !roomNumber || !description) {
-        return res.status(400).json({ 
-          status: "error", 
-          error: { message: "All required fields must be provided" } 
+        return res.status(400).json({
+          status: "error",
+          error: { message: "All required fields must be provided" }
         });
       }
 
@@ -1360,19 +1408,19 @@ app.get(
         }
       }
 
-      return res.json({ 
-        status: "success", 
-        data: { 
+      return res.json({
+        status: "success",
+        data: {
           id: routineMaintenance.id,
-          message: "Routine maintenance task created successfully" 
-        } 
+          message: "Routine maintenance task created successfully"
+        }
       });
 
     } catch (error) {
       console.error('❌ Error in routine maintenance route:', error);
-      return res.status(500).json({ 
-        status: "error", 
-        error: { message: "Failed to create routine maintenance task" } 
+      return res.status(500).json({
+        status: "error",
+        error: { message: "Failed to create routine maintenance task" }
       });
     }
   });
@@ -2271,7 +2319,7 @@ app.get(
       // Map DB result to ensure roomNumbers is always an array
       const result = {
         ...building,
-        roomNumbers: building.roomNumbers ?? [],
+        roomNumbers: building.room_numbers ?? [],
       };
       res.json(result);
     } catch (error) {
@@ -2302,8 +2350,9 @@ app.get(
         name: req.body.name,
         address: req.body.address,
         description: req.body.description,
-        room_numbers: updateRoomNumbers, // Always an array
+        roomNumbers: updateRoomNumbers, // Always an array, camelCase for Drizzle
       };
+      console.log("Updating building with:", updates);
 
       const building = await dbStorage.updateBuilding(buildingId, updates);
       // Map DB result to ensure roomNumbers is always an array
@@ -3027,15 +3076,63 @@ app.get(
   // Contact form submission endpoint
   app.post("/api/contact", async (req, res) => {
     try {
-      const parsed = insertContactMessageSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid input", details: parsed.error.errors });
+      const { firstName, lastName, email, organization, subject, message } = req.body;
+
+      // Validate required fields
+      if (!firstName || !lastName || !email || !subject || !message) {
+        return res.status(400).json({ 
+          message: "Missing required fields" 
+        });
       }
-      console.log("[CONTACT] Validation passed:", parsed.data);
-      const [created] = await db.insert(contactMessages).values(parsed.data).returning();
-      res.status(201).json({ success: true, message: "Message received", data: created });
+
+      // Get all admin and super_admin users
+      const adminUsers = await dbStorage.getAllUsers();
+      const adminEmails = adminUsers
+        .filter(user => user.role === 'admin' || user.role === 'super_admin')
+        .map(user => user.email);
+
+      if (adminEmails.length === 0) {
+        return res.status(500).json({ 
+          message: "No admin users found to receive contact form submissions" 
+        });
+      }
+
+      // Send email to all admins
+      const emailContent = `
+        New Contact Form Submission
+        
+        From: ${firstName} ${lastName}
+        Email: ${email}
+        Organization: ${organization || 'Not specified'}
+        Subject: ${subject}
+        
+        Message:
+        ${message}
+        
+        ---
+        This message was sent from the RepairRequest contact form.
+      `;
+
+      // Send to each admin
+      for (const adminEmail of adminEmails) {
+        await sendEmail({
+          to: adminEmail,
+          from: process.env.FROM_EMAIL || 'noreply@repairrequest.com',
+          subject: `Contact Form: ${subject}`,
+          text: emailContent,
+          html: emailContent.replace(/\n/g, '<br>')
+        });
+      }
+
+      res.json({ 
+        message: "Your message has been sent successfully. We'll get back to you soon." 
+      });
+
     } catch (error) {
-      res.status(500).json({ error: "Failed to submit message" });
+      console.error("Contact form error:", error);
+      res.status(500).json({ 
+        message: "Failed to send message. Please try again later." 
+      });
     }
   });
 
@@ -3063,7 +3160,7 @@ app.get(
       // Check if user exists
       const existing = await db.query.users.findFirst({ where: eq(users.email, email) });
       if (existing) {
-        console.log("❌ User already exists:", email);
+        console.log("User already exists:", email);
         return res.status(409).json({ message: "User with this email already exists" });
       }
 
@@ -3080,23 +3177,29 @@ app.get(
         lastName,
         password: hashed,
         role: "requester",
+        organizationId: null, // Explicitly set to null for new users
         createdAt: now,
         updatedAt: now,
       }).returning();
 
-      console.log("✅ User created:", user);
+      console.log("User created:", user);
+
+      // Set session for user (no Google Auth/passport)
+      req.session.user = {
+        id: user.id,
+        email: user.email || '',
+        role: user.role,
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        organizationId: user.organizationId ?? null
+      };
 
       return res.status(201).json({
         message: "Signup successful",
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-        },
+        user: req.session.user,
       });
     } catch (err: any) {
-      console.error("🔥 Signup error:", err);
+      console.error("Signup error:", err);
       return res.status(500).json({
         message: "Signup failed",
         error: err.message,
@@ -3135,7 +3238,7 @@ app.get(
         role: user.role,
         firstName: user.firstName || '',
         lastName: user.lastName || '',
-        organizationId: user.organizationId ?? undefined
+        organizationId: user.organizationId ?? null
       };
 
       return res.status(200).json({
@@ -3173,6 +3276,77 @@ app.get(
       if (err) return res.status(500).send(err);
       res.json({ url });
     });
+  });
+
+  // Get buildings for current user's organization
+  app.get("/api/buildings", authMiddleware, async (req: any, res) => {
+    try {
+      const user = req.user;
+      console.log("Buildings route - User from session:", user);
+      console.log("Buildings route - User organizationId:", user?.organizationId);
+      
+      if (!user.organizationId) {
+        console.log("Buildings route - No organization assigned, returning empty array");
+        return res.json([]); // No organization assigned, return empty array
+      }
+
+      console.log("Buildings route - Fetching buildings for organizationId:", user.organizationId);
+      const buildings = await dbStorage.getBuildingsByOrganization(user.organizationId);
+      console.log("Buildings route - Found buildings:", buildings);
+      res.json(buildings);
+    } catch (error) {
+      console.error("Error fetching buildings:", error);
+      res.status(500).json({ message: "Failed to fetch buildings" });
+    }
+  });
+
+  // Test route to check user session
+  app.get("/api/test-session", authMiddleware, async (req: any, res) => {
+    try {
+      console.log("Test session route called");
+      console.log("Full req.user:", req.user);
+      console.log("Session data:", req.session);
+      
+      // Also fetch user from database to compare
+      if (req.user?.id) {
+        const dbUser = await dbStorage.getUser(req.user.id);
+        console.log("User from database:", dbUser);
+        res.json({
+          sessionUser: req.user,
+          dbUser: dbUser,
+          session: req.session
+        });
+      } else {
+        res.json({ error: "No user in session" });
+      }
+    } catch (error) {
+      console.error("Test session error:", error);
+      res.status(500).json({ error: "Test session failed" });
+    }
+  });
+
+  // Manual trigger for routine maintenance scheduler (super admin only)
+  app.post("/api/admin/routine-maintenance/trigger", authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await dbStorage.getUser(userId);
+
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: "Super admin access required" });
+      }
+
+      // Import and run the scheduler
+      const { RoutineMaintenanceScheduler } = await import('./routineMaintenanceScheduler');
+      await RoutineMaintenanceScheduler.checkAndCreateTickets();
+
+      res.json({ 
+        message: "Routine maintenance scheduler executed successfully",
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error triggering routine maintenance scheduler:", error);
+      res.status(500).json({ message: "Failed to trigger scheduler" });
+    }
   });
 
   const httpServer = createServer(app);

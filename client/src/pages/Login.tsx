@@ -83,7 +83,7 @@ export default function Login() {
             <div className="flex justify-center space-x-6 text-sm text-gray-500">
               <Link to="/support" className="hover:text-blue-600 transition-colors">Support</Link>
               <Link to="/about" className="hover:text-blue-600 transition-colors">About</Link>
-              <Link to="/privacy" className="hover:text-blue-600 transition-colors">Privacy</Link>
+              <Link to="/privacy" className="hover:text-blue-600 transition-colors">Privacy Policy</Link>
             </div>
           </div>
         </div>

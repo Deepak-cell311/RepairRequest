@@ -73,6 +73,7 @@ export interface IStorage {
   // Organization operations
   createOrganization(orgData: InsertOrganization): Promise<Organization>;
   getOrganization(id: number): Promise<Organization | undefined>;
+  getOrganizationById(id: number): Promise<Organization | undefined>;
   getOrganizationBySlug(slug: string): Promise<Organization | undefined>;
   getOrganizationByDomain(domain: string): Promise<Organization | undefined>;
   updateOrganization(id: number, updates: Partial<InsertOrganization>): Promise<Organization>;
@@ -173,6 +174,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getOrganization(id: number): Promise<Organization | undefined> {
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, id));
+    return org;
+  }
+
+  async getOrganizationById(id: number): Promise<Organization | undefined> {
     const [org] = await db.select().from(organizations).where(eq(organizations.id, id));
     return org;
   }
@@ -341,23 +347,14 @@ export class DatabaseStorage implements IStorage {
     ));
   }
   
-  async getAllUsers(): Promise<any[]> {
-    return db
-      .select({
-        id: users.id,
-        email: users.email,
-        firstName: users.firstName,
-        lastName: users.lastName,
-        role: users.role,
-        organizationId: users.organizationId,
-        organizationName: organizations.name,
-        profileImageUrl: users.profileImageUrl,
-        createdAt: users.createdAt,
-        updatedAt: users.updatedAt,
-      })
-      .from(users)
-      .leftJoin(organizations, eq(users.organizationId, organizations.id))
-      .orderBy(users.email);
+  async getAllUsers(): Promise<User[]> {
+    try {
+      const users = await db.select().from(users);
+      return users;
+    } catch (error) {
+      console.error("Error fetching all users:", error);
+      throw error;
+    }
   }
 
   async updateUserRole(userId: string, role: string): Promise<User> {

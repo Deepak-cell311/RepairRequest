@@ -50,7 +50,7 @@ export default function Contact() {
 
       console.log("Response: ", res)
       if (res.ok) {
-        setSuccess("Your message has been sent! We'll get back to you soon.");
+        setSuccess("Your message has been sent! Someone will be in touch with you shortly.");
         setForm({
           firstName: "",
           lastName: "",
@@ -210,7 +210,7 @@ export default function Contact() {
               <div className="mt-8 p-6 bg-blue-50 rounded-lg">
                 <h3 className="font-semibold text-gray-900 mb-2">Need Immediate Support?</h3>
                 <p className="text-gray-600 mb-4">
-                  If you're an existing customer with an urgent issue, please log into your portal and use the live chat feature for fastest response.
+                  If you're an existing customer with an urgent issue, please log into your portal.
                 </p>
                 <Link to="/signup">
                   <Button className="bg-blue-600 hover:bg-blue-700">
@@ -348,9 +348,11 @@ export default function Contact() {
             </div>
 
             <div className="text-center mt-8">
-              <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
-                Schedule Demo
-              </Button>
+              <Link to="/">
+                <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
+                  Schedule Demo
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -389,7 +391,7 @@ export default function Contact() {
               <ul className="space-y-2 text-gray-400">
                 <li><Link to="/about" className="hover:text-white transition-colors">About</Link></li>
                 <li><Link to="/contact" className="hover:text-white transition-colors">Contact</Link></li>
-                <li><Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link></li>
+                <li><Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
                 <li><Link to="/terms" className="hover:text-white transition-colors">Terms</Link></li>
               </ul>
             </div>
