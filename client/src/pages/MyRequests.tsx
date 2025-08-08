@@ -31,7 +31,7 @@ export default function MyRequests() {
           <h1 className="text-2xl font-heading font-bold text-gray-900">My Requests</h1>
           <div className="space-x-2">
             <Button onClick={() => navigate("/new-facilities-request")}>New Labor Request</Button>
-            <Button variant="outline" onClick={() => navigate("/new-building-request")}>New Building Request</Button>
+            <Button variant="outline" onClick={() => navigate("/new-building-request")}>New Repair Request</Button>
           </div>
         </div>
         
@@ -72,7 +72,7 @@ export default function MyRequests() {
                       variant="outline"
                       onClick={() => navigate("/new-building-request")}
                     >
-                      Create Building Request
+                      Create Repair Request
                     </Button>
                   </div>
                 </div>

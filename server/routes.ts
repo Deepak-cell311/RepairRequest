@@ -1610,7 +1610,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Create a new building request with photo upload  
   app.post("/api/building-requests", (req, res, next) => {
-    console.log("🚨🚨🚨 BUILDING REQUEST ENDPOINT HIT - PHOTOS DEBUG 🚨🚨🚨");
+    console.log("BUILDING REQUEST ENDPOINT HIT - PHOTOS DEBUG");
     console.log("Request URL:", req.url);
     console.log("Request method:", req.method);
     console.log("Content-Type:", req.headers['content-type']);
@@ -1630,7 +1630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log("Body before multer:", req.body);
 
     upload.array('photos', 5)(req, res, (err) => {
-      console.log("🎯🎯🎯 MULTER CALLBACK REACHED 🎯🎯🎯");
+      console.log("MULTER CALLBACK REACHED");
       console.log("Error:", err);
       console.log("Files after multer:", req.files);
       console.log("Body after multer:", req.body);
