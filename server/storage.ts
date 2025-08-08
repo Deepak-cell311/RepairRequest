@@ -349,8 +349,8 @@ export class DatabaseStorage implements IStorage {
   
   async getAllUsers(): Promise<User[]> {
     try {
-      const users = await db.select().from(users);
-      return users;
+      const allUsers = await db.select().from(users);
+      return allUsers;
     } catch (error) {
       console.error("Error fetching all users:", error);
       throw error;
