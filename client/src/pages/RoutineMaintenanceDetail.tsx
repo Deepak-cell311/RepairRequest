@@ -187,7 +187,43 @@ export default function RoutineMaintenanceDetail() {
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Clock className="h-4 w-4" />
-                  <span>Next Due: {format(new Date(taskData.dateBegun), 'PPP')}</span>
+                  <span>
+                    Next Due: {
+                      (() => {
+                        const begun = new Date(taskData.dateBegun);
+                        let nextDue: Date = new Date(begun);
+                        if (taskData.recurrence) {
+                          switch (taskData.recurrence.toLowerCase()) {
+                            case 'daily':
+                              nextDue.setDate(begun.getDate() + 1);
+                              break;
+                            case 'weekly':
+                              nextDue.setDate(begun.getDate() + 7);
+                              break;
+                            case 'biweekly':
+                              nextDue.setDate(begun.getDate() + 14);
+                              break;
+                            case 'monthly':
+                              nextDue.setMonth(begun.getMonth() + 1);
+                              break;
+                            case 'quarterly':
+                              nextDue.setMonth(begun.getMonth() + 3);
+                              break;
+                            case 'yearly':
+                              nextDue.setFullYear(begun.getFullYear() + 1);
+                              break;
+                            default:
+                              // If customRecurrence is set, use that (in days)
+                              if (taskData.customRecurrence && !isNaN(Number(taskData.customRecurrence))) {
+                                nextDue.setDate(begun.getDate() + Number(taskData.customRecurrence));
+                              }
+                              break;
+                          }
+                        }
+                        return format(nextDue, 'PPP');
+                      })()
+                    }
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <User className="h-4 w-4" />

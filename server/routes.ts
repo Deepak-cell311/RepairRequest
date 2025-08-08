@@ -1384,7 +1384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Handle photo uploads
       if (req.files && req.files.length > 0) {
         console.log(`Processing ${req.files.length} photos...`);
-
+        
         for (const file of req.files as any[]) {
           try {
             const photoData = {
@@ -3076,15 +3076,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Contact form submission endpoint
   app.post("/api/contact", async (req, res) => {
     try {
-      const parsed = insertContactMessageSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid input", details: parsed.error.errors });
+      const { firstName, lastName, email, organization, subject, message } = req.body;
+
+      // Validate required fields
+      if (!firstName || !lastName || !email || !subject || !message) {
+        return res.status(400).json({ 
+          message: "Missing required fields" 
+        });
       }
-      console.log("[CONTACT] Validation passed:", parsed.data);
-      const [created] = await db.insert(contactMessages).values(parsed.data).returning();
-      res.status(201).json({ success: true, message: "Message received", data: created });
+
+      // Get all admin and super_admin users
+      const adminUsers = await dbStorage.getAllUsers();
+      const adminEmails = adminUsers
+        .filter(user => user.role === 'admin' || user.role === 'super_admin')
+        .map(user => user.email);
+
+      if (adminEmails.length === 0) {
+        return res.status(500).json({ 
+          message: "No admin users found to receive contact form submissions" 
+        });
+      }
+
+      // Send email to all admins
+      const emailContent = `
+        New Contact Form Submission
+        
+        From: ${firstName} ${lastName}
+        Email: ${email}
+        Organization: ${organization || 'Not specified'}
+        Subject: ${subject}
+        
+        Message:
+        ${message}
+        
+        ---
+        This message was sent from the RepairRequest contact form.
+      `;
+
+      // Send to each admin
+      for (const adminEmail of adminEmails) {
+        await sendEmail({
+          to: adminEmail,
+          from: process.env.FROM_EMAIL || 'noreply@repairrequest.com',
+          subject: `Contact Form: ${subject}`,
+          text: emailContent,
+          html: emailContent.replace(/\n/g, '<br>')
+        });
+      }
+
+      res.json({ 
+        message: "Your message has been sent successfully. We'll get back to you soon." 
+      });
+
     } catch (error) {
-      res.status(500).json({ error: "Failed to submit message" });
+      console.error("Contact form error:", error);
+      res.status(500).json({ 
+        message: "Failed to send message. Please try again later." 
+      });
     }
   });
 

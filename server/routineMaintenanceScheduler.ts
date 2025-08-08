@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { routineMaintenance, requests } from "@shared/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
-import { addDays, addWeeks, addMonths, isSameDay, startOfDay, endOfDay } from "date-fns";
+import { addDays, addWeeks, addMonths, isSameDay, startOfDay, endOfDay, addYears } from "date-fns";
 
 export class RoutineMaintenanceScheduler {
   /**
@@ -10,7 +10,7 @@ export class RoutineMaintenanceScheduler {
    */
   static async checkAndCreateTickets() {
     try {
-      console.log("🕐 Starting routine maintenance ticket creation check...");
+      console.log("Starting routine maintenance ticket creation check...");
       
       const today = new Date();
       const todayStart = startOfDay(today);
@@ -22,15 +22,15 @@ export class RoutineMaintenanceScheduler {
         .from(routineMaintenance)
         .where(eq(routineMaintenance.isActive, true));
       
-      console.log(`📋 Found ${activeTasks.length} active routine maintenance tasks`);
+      console.log(`Found ${activeTasks.length} active routine maintenance tasks`);
       
       for (const task of activeTasks) {
         await this.processTask(task, todayStart, todayEnd);
       }
       
-      console.log("✅ Routine maintenance ticket creation check completed");
+      console.log("Routine maintenance ticket creation check completed");
     } catch (error) {
-      console.error("❌ Error in routine maintenance scheduler:", error);
+      console.error("Error in routine maintenance scheduler:", error);
     }
   }
   
@@ -43,7 +43,7 @@ export class RoutineMaintenanceScheduler {
       
       // Check if the task is due today
       if (nextDueDate >= todayStart && nextDueDate <= todayEnd) {
-        console.log(`📅 Task ${task.id} (${task.facility} - ${task.event}) is due today`);
+        console.log(`Task ${task.id} (${task.facility} - ${task.event}) is due today`);
         
         // Check if a ticket already exists for today
         const existingTicket = await this.checkExistingTicket(task, todayStart, todayEnd);
@@ -51,11 +51,11 @@ export class RoutineMaintenanceScheduler {
         if (!existingTicket) {
           await this.createTicket(task);
         } else {
-          console.log(`⚠️ Ticket already exists for task ${task.id} today`);
+          console.log(`Ticket already exists for task ${task.id} today`);
         }
       }
     } catch (error) {
-      console.error(`❌ Error processing task ${task.id}:`, error);
+      console.error(`Error processing task ${task.id}:`, error);
     }
   }
   
@@ -72,12 +72,13 @@ export class RoutineMaintenanceScheduler {
     }
     
     // Calculate next occurrence based on recurrence
-    let nextDate = new Date(startDate);
+    let nextDate: Date = new Date(startDate);
     
     while (nextDate <= today) {
       switch (task.recurrence) {
         case 'daily':
           nextDate = addDays(nextDate, 1);
+          // nextDate.setDate(nextDate.getDate() + 1);
           break;
         case 'weekly':
           nextDate = addWeeks(nextDate, 1);
@@ -85,6 +86,14 @@ export class RoutineMaintenanceScheduler {
         case 'monthly':
           nextDate = addMonths(nextDate, 1);
           break;
+        case 'biweekly':
+          nextDate = addDays(nextDate, 14);
+          break;
+        case 'quarterly':
+          nextDate = addMonths(nextDate, 3);
+          break;
+        case 'yearly':
+          nextDate = addYears(nextDate, 1);
         case 'custom':
           // For custom recurrence, use the customRecurrence field
           if (task.customRecurrence) {

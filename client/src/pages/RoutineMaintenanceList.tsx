@@ -11,15 +11,19 @@ import { Link } from "react-router-dom";
 function calculateNextDueDate(task: any): string {
   const startDate = new Date(task.dateBegun);
   const today = new Date();
-  
+
+  const {user, users}: any = useAuth();
+  console.log("List of users: ", users);
+  console.log("List of user: ", user);
+
   // If the start date is in the future, return it
   if (startDate > today) {
     return format(startDate, 'PPP');
   }
-  
+
   // Calculate next occurrence based on recurrence
   let nextDate = new Date(startDate);
-  
+
   while (nextDate <= today) {
     switch (task.recurrence) {
       case 'daily':
@@ -43,7 +47,7 @@ function calculateNextDueDate(task: any): string {
         nextDate = addDays(nextDate, 7);
     }
   }
-  
+
   return format(nextDate, 'PPP');
 }
 
@@ -88,6 +92,7 @@ export default function RoutineMaintenanceList() {
   }
 
   const tasks = (routineMaintenance as any)?.data || [];
+  console.log("List of tasks: ", tasks);
 
   return (
     <div className="p-6">
@@ -143,12 +148,70 @@ export default function RoutineMaintenanceList() {
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Clock className="h-4 w-4" />
-                        <span>Next: {calculateNextDueDate(task)}</span>
+                        <span>
+                          Next Due: {
+                            (() => {
+                              // Use the correct "task" object, not "tasks", and guard against invalid dates
+                              if (!task.dateBegun || isNaN(new Date(task.dateBegun).getTime())) {
+                                return "Invalid start date";
+                              }
+                              const begun = new Date(task.dateBegun);
+                              let nextDue: Date = new Date(begun);
+                              if (task.recurrence) {
+                                switch (task.recurrence.toLowerCase()) {
+                                  case 'daily':
+                                    nextDue.setDate(begun.getDate() + 1);
+                                    break;
+                                  case 'weekly':
+                                    nextDue.setDate(begun.getDate() + 7);
+                                    break;
+                                  case 'biweekly':
+                                    nextDue.setDate(begun.getDate() + 14);
+                                    break;
+                                  case 'monthly':
+                                    nextDue.setMonth(begun.getMonth() + 1);
+                                    break;
+                                  case 'quarterly':
+                                    nextDue.setMonth(begun.getMonth() + 3);
+                                    break;
+                                  case 'bi-annually':
+                                    nextDue.setMonth(begun.getMonth() + 6);
+                                    break;
+                                  case 'annually':
+                                  case 'yearly':
+                                    nextDue.setFullYear(begun.getFullYear() + 1);
+                                    break;
+                                  case 'custom':
+                                    if (task.customRecurrence && !isNaN(Number(task.customRecurrence))) {
+                                      nextDue.setDate(begun.getDate() + Number(task.customRecurrence));
+                                    }
+                                    break;
+                                  default:
+                                    // If customRecurrence is set, use that (in days)
+                                    if (task.customRecurrence && !isNaN(Number(task.customRecurrence))) {
+                                      nextDue.setDate(begun.getDate() + Number(task.customRecurrence));
+                                    }
+                                    break;
+                                }
+                              }
+                              // Check for invalid date
+                              if (isNaN(nextDue.getTime())) {
+                                return "Invalid next due date";
+                              }
+                              return format(nextDue, 'PPP');
+                            })()
+                          }
+                        </span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      {/* <div className="flex items-center gap-2 text-sm text-gray-600">
                         <User className="h-4 w-4" />
-                        <span>Created by: {task.createdBy?.firstName} {task.createdBy?.lastName}</span>
-                      </div>
+                        <span>
+                          Created by:{" "}
+                          {users && users[task.createdById]
+                            ? `${users[task.createdById].firstName ?? ""} ${users[task.createdById].lastName ?? ""}`.trim()
+                            : task.createdById}
+                        </span>
+                      </div> */}
                     </div>
                     <div>
                       {task.description && (
@@ -161,7 +224,7 @@ export default function RoutineMaintenanceList() {
                       )}
                     </div>
                   </div>
-                  
+
                   <div className="mt-4 pt-4 border-t">
                     <div className="flex justify-between items-center">
                       <div className="text-sm text-gray-500">

@@ -347,23 +347,14 @@ export class DatabaseStorage implements IStorage {
     ));
   }
   
-  async getAllUsers(): Promise<any[]> {
-    return db
-      .select({
-        id: users.id,
-        email: users.email,
-        firstName: users.firstName,
-        lastName: users.lastName,
-        role: users.role,
-        organizationId: users.organizationId,
-        organizationName: organizations.name,
-        profileImageUrl: users.profileImageUrl,
-        createdAt: users.createdAt,
-        updatedAt: users.updatedAt,
-      })
-      .from(users)
-      .leftJoin(organizations, eq(users.organizationId, organizations.id))
-      .orderBy(users.email);
+  async getAllUsers(): Promise<User[]> {
+    try {
+      const users = await db.select().from(users);
+      return users;
+    } catch (error) {
+      console.error("Error fetching all users:", error);
+      throw error;
+    }
   }
 
   async updateUserRole(userId: string, role: string): Promise<User> {
