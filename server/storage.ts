@@ -126,6 +126,7 @@ export interface IStorage {
   // Room history
   getAllBuildings(): Promise<string[]>;
   getRequestsByBuilding(building: string, roomNumber?: string): Promise<any[]>;
+  getRoutineMaintenanceByBuilding(building: string, roomNumber?: string): Promise<any[]>;
   
   // Request timeline and messaging
   getRequestTimeline(requestId: number): Promise<any[]>;
@@ -582,7 +583,7 @@ export class DatabaseStorage implements IStorage {
         .limit(limit);
 
       // Get routine maintenance tasks created by user
-      const routineMaintenance = await db
+      const routineMaintenanceTasks = await db
         .select({
           id: routineMaintenance.id,
           requestType: sql`'routine_maintenance'`,
@@ -603,7 +604,7 @@ export class DatabaseStorage implements IStorage {
         .limit(limit);
 
       // Combine and sort by creation date
-      const allRequests = [...regularRequests, ...routineMaintenance];
+      const allRequests = [...regularRequests, ...routineMaintenanceTasks];
       return allRequests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } catch (error) {
       console.error("Error getting user requests:", error);
@@ -1109,15 +1110,24 @@ export class DatabaseStorage implements IStorage {
   // Room history
   async getAllBuildings(): Promise<string[]> {
     try {
+      // Get buildings from both building_requests and routine_maintenance tables
       const result = await db.execute(sql`
-        SELECT DISTINCT building 
-        FROM building_requests 
-        WHERE building IS NOT NULL AND building != ''
-        ORDER BY building
+        SELECT DISTINCT building_name 
+        FROM (
+          SELECT building as building_name FROM building_requests 
+          WHERE building IS NOT NULL AND building != ''
+          UNION
+          SELECT facility as building_name FROM routine_maintenance 
+          WHERE facility IS NOT NULL AND facility != ''
+        ) AS all_buildings
+        ORDER BY building_name
       `);
       
+      console.log("Storage: getAllBuildings found", result.rows.length, "unique buildings");
+      console.log("Storage: Building list:", result.rows.map((row: any) => row.building_name));
+      
       // Extract the building names from the result
-      return result.rows.map((row: any) => row.building);
+      return result.rows.map((row: any) => row.building_name);
     } catch (error) {
       console.error("Error fetching all buildings:", error);
       return [];
@@ -1126,6 +1136,8 @@ export class DatabaseStorage implements IStorage {
   
   async getRequestsByBuilding(building: string, roomNumber?: string): Promise<any[]> {
     try {
+      console.log("Storage: getRequestsByBuilding called with:", { building, roomNumber });
+      
       let query;
       
       if (roomNumber) {
@@ -1154,7 +1166,19 @@ export class DatabaseStorage implements IStorage {
         `;
       }
       
+      // First, let's check what building requests exist
+      const debugQuery = sql`SELECT DISTINCT building FROM building_requests ORDER BY building`;
+      const debugResult = await db.execute(debugQuery);
+      console.log("Storage: Available buildings in building_requests:", debugResult.rows.map((r: any) => r.building));
+      
+      // Check total building requests
+      const countQuery = sql`SELECT COUNT(*) as total FROM building_requests`;
+      const countResult = await db.execute(countQuery);
+      console.log("Storage: Total building requests in database:", countResult.rows[0]?.total);
+      
+      console.log("Storage: Executing SQL query for building requests");
       const result = await db.execute(query);
+      console.log("Storage: Raw result from database:", result.rows.length, "rows");
       
       // Format the results
       return result.rows.map((row: any) => {
@@ -1181,6 +1205,54 @@ export class DatabaseStorage implements IStorage {
       });
     } catch (error) {
       console.error("Error fetching requests by building:", error);
+      return [];
+    }
+  }
+
+  async getRoutineMaintenanceByBuilding(building: string, roomNumber?: string): Promise<any[]> {
+    try {
+      let query;
+
+      if (roomNumber) {
+        query = sql`
+          SELECT rm.*, u.id as requestor_id, u.first_name as requestor_first_name, 
+                 u.last_name as requestor_last_name, u.profile_image_url as requestor_image
+          FROM routine_maintenance rm
+          JOIN users u ON rm.created_by_id = u.id
+          WHERE rm.facility = ${building} AND rm.room_number = ${roomNumber}
+          ORDER BY rm.created_at DESC
+        `;
+      } else {
+        query = sql`
+          SELECT rm.*, u.id as requestor_id, u.first_name as requestor_first_name, 
+                 u.last_name as requestor_last_name, u.profile_image_url as requestor_image
+          FROM routine_maintenance rm
+          JOIN users u ON rm.created_by_id = u.id
+          WHERE rm.facility = ${building}
+          ORDER BY rm.created_at DESC
+        `;
+      }
+
+      const result = await db.execute(query);
+
+      return result.rows.map((row: any) => ({
+        id: row.id,
+        requestType: 'routine_maintenance',
+        facility: row.facility,
+        event: row.event,
+        eventDate: row.date_begun,
+        status: 'active',
+        priority: 'medium',
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        requestor: {
+          id: row.requestor_id,
+          name: `${row.requestor_first_name || ''} ${row.requestor_last_name || ''}`.trim(),
+          profileImageUrl: row.requestor_image
+        }
+      }));
+    } catch (error) {
+      console.error("Error fetching routine maintenance by building:", error);
       return [];
     }
   }

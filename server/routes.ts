@@ -13,6 +13,8 @@ import AWS from 'aws-sdk';
 import { sendEmail } from "./emailService";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import * as cheerio from "cheerio";
+import axios from 'axios'
 
 // Extend session interface to include user property
 declare module "express-session" {
@@ -2801,15 +2803,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const building = req.query.building as string;
       const roomNumber = req.query.roomNumber as string | undefined;
 
+      console.log("Room history API called with:", { building, roomNumber, userId });
+
       if (!building) {
         return res.status(400).json({ message: "Building parameter is required" });
       }
 
       const requests = await dbStorage.getRequestsByBuilding(building, roomNumber);
+      console.log("Room history requests found:", requests.length);
+      console.log("Sample request data:", requests[0] || "No requests");
+      
       res.json(requests);
     } catch (error) {
       console.error("Error fetching room history:", error);
       res.status(500).json({ message: "Failed to fetch room history" });
+    }
+  });
+
+  // Get routine maintenance by building and optionally room number
+  app.get("/api/room-routine-maintenance", authMiddleware, async (req: any, res) => {
+    try {
+      const { userId } = await getUserInfo(req);
+
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const building = req.query.building as string;
+      const roomNumber = req.query.roomNumber as string | undefined;
+
+      console.log("Routine maintenance API called with:", { building, roomNumber, userId });
+
+      if (!building) {
+        return res.status(400).json({ message: "Building parameter is required" });
+      }
+
+      const routineMaintenance = await dbStorage.getRoutineMaintenanceByBuilding(building, roomNumber);
+      console.log("Routine maintenance tasks found:", routineMaintenance.length);
+      console.log("Sample routine maintenance data:", routineMaintenance[0] || "No routine maintenance");
+      
+      res.json(routineMaintenance);
+    } catch (error) {
+      console.error("Error fetching routine maintenance by building:", error);
+      res.status(500).json({ message: "Failed to fetch routine maintenance" });
     }
   });
 
@@ -3363,6 +3399,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error triggering routine maintenance scheduler:", error);
       res.status(500).json({ message: "Failed to trigger scheduler" });
+    }
+  });
+
+  app.get("/embed-section", async (req, res) => {
+    try {
+      const url = "https://schoolhouselogistics.com/contact";
+      const response = await axios.get(url);
+      const $ = cheerio.load(response.data);
+  
+      const section = $("div.grid.lg\\:grid-cols-2.gap-12").first();
+  
+      if (section.length) {
+        res.json({ html: $.html(section) });
+      } else {
+        res.status(404).json({ error: "Section not found" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch section", details: error.message });
     }
   });
 

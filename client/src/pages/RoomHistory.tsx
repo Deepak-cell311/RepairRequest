@@ -4,10 +4,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Building, User, AlertCircle, Wrench } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import RequestCard from "@/components/requests/RequestCard";
 import { format } from "date-fns";
 
@@ -15,12 +16,14 @@ export default function RoomHistory() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const [selectedBuilding, setSelectedBuilding] = useState<string>("");
+  const [selectedBuildingRoutine, setSelectedBuildingRoutine] = useState<string>("");
   const [selectedRoom, setSelectedRoom] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [dateRange, setDateRange] = useState<{ start?: string; end?: string }>({
     start: undefined,
     end: undefined
   });
+  const [activeTab, setActiveTab] = useState<string>("requests");
   
   // Get list of all buildings
   const { data: buildings = [], isLoading: buildingsLoading } = useQuery<string[]>({
@@ -29,7 +32,7 @@ export default function RoomHistory() {
   });
 
   // Get all requests for the selected building/room
-  const { data: requests = [], isLoading: requestsLoading } = useQuery<any[]>({
+  const { data: requests = [], isLoading: requestsLoading, error: requestsError } = useQuery<any[]>({
     queryKey: ["/api/room-history", selectedBuilding, selectedRoom === "all" ? undefined : selectedRoom],
     queryFn: async () => {
       if (!selectedBuilding) return [];
@@ -39,18 +42,59 @@ export default function RoomHistory() {
         params.append("roomNumber", selectedRoom);
       }
       
+      console.log("Fetching room history with params:", params.toString());
       const response = await fetch(`/api/room-history?${params.toString()}`, {
         credentials: 'include'
       });
       
       if (!response.ok) {
+        console.error("Room history fetch failed:", response.status, response.statusText);
         throw new Error(`Failed to fetch room history: ${response.statusText}`);
       }
       
-      return response.json();
+      const data = await response.json();
+      console.log("Room history data received:", data);
+      return data;
     },
     enabled: isAuthenticated && !!selectedBuilding,
   });
+
+  // Get routine maintenance for the selected building/room
+  const { data: routineMaintenance = [], isLoading: routineMaintenanceLoading, error: routineMaintenanceError } = useQuery<any[]>({
+    queryKey: ["/api/room-routine-maintenance", selectedBuilding, selectedRoom === "all" ? undefined : selectedRoom],
+    queryFn: async () => {
+      if (!selectedBuilding) return [];
+      
+      const params = new URLSearchParams({ building: selectedBuilding });
+      if (selectedRoom && selectedRoom !== "all") {
+        params.append("roomNumber", selectedRoom);
+      }
+      
+      console.log("Fetching routine maintenance with params:", params.toString());
+      const response = await fetch(`/api/room-routine-maintenance?${params.toString()}`, {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        console.error("Routine maintenance fetch failed:", response.status, response.statusText);
+        throw new Error(`Failed to fetch routine maintenance: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log("Routine maintenance data received:", data);
+      return data;
+    },
+    enabled: isAuthenticated && !!selectedBuilding,
+  });
+
+  // Debug logging
+  console.log("Room History Debug Info:");
+  console.log("- Selected Building:", selectedBuilding);
+  console.log("- Selected Room:", selectedRoom);
+  console.log("- Requests data:", requests);
+  console.log("- Routine Maintenance data:", routineMaintenance);
+  console.log("- Requests error:", requestsError);
+  console.log("- Routine Maintenance error:", routineMaintenanceError);
 
   // Filter requests based on search term, date range, and user role
   const filteredRequests = requests.filter((request: any) => {
@@ -77,6 +121,22 @@ export default function RoomHistory() {
     return matchesSearch && matchesDateRange;
   });
 
+  // Filter routine maintenance based on search term and date range
+  const filteredRoutineMaintenance = routineMaintenance.filter((task: any) => {
+    // Filter by search term if provided
+    const matchesSearch = !searchTerm || 
+      task.event.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      task.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Filter by date range if provided
+    const taskDate = new Date(task.eventDate);
+    const matchesDateRange = 
+      (!dateRange.start || taskDate >= new Date(dateRange.start)) &&
+      (!dateRange.end || taskDate <= new Date(dateRange.end));
+    
+    return matchesSearch && matchesDateRange;
+  });
+
   // When building changes, reset room selection
   useEffect(() => {
     setSelectedRoom("all");
@@ -92,6 +152,25 @@ export default function RoomHistory() {
     }
     return acc;
   }, []);
+
+  // Helper function to calculate next due date for routine maintenance
+  const calculateNextDueDate = (task: any): string => {
+    const startDate = new Date(task.eventDate);
+    const today = new Date();
+
+    // If the start date is in the future, return it
+    if (startDate > today) {
+      return format(startDate, 'PPP');
+    }
+
+    // Calculate next occurrence based on recurrence (assuming daily for now)
+    let nextDate = new Date(startDate);
+    while (nextDate <= today) {
+      nextDate.setDate(nextDate.getDate() + 1); // Daily recurrence
+    }
+
+    return format(nextDate, 'PPP');
+  };
 
   return (
     <div className="py-6">
@@ -202,6 +281,24 @@ export default function RoomHistory() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {!selectedBuilding ? (
+              <div className="text-center py-8 text-gray-500">
+                Select a building to view maintenance history
+              </div>
+            ) : (
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="requests" className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    Repair Requests ({filteredRequests.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="routine" className="flex items-center gap-2">
+                    <Wrench className="h-4 w-4" />
+                    Routine Maintenance ({filteredRoutineMaintenance.length})
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="requests" className="mt-6">
             {requestsLoading ? (
               <div className="text-center py-8">Loading request history...</div>
             ) : filteredRequests?.length > 0 ? (
@@ -214,10 +311,65 @@ export default function RoomHistory() {
               <div className="text-center py-8 text-gray-500">
                 {user?.role === "requester"
                   ? "You have not submitted any requests for this room yet."
-                  : selectedBuilding
-                  ? `No repair requests found for ${selectedBuilding}${selectedRoom ? ` - Room ${selectedRoom}` : ""}`
-                  : "Select a building to view maintenance history"}
+                        : `No repair requests found for ${selectedBuilding}${selectedRoom ? ` - Room ${selectedRoom}` : ""}`}
+                    </div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="routine" className="mt-6">
+                  {routineMaintenanceLoading ? (
+                    <div className="text-center py-8">Loading routine maintenance...</div>
+                  ) : filteredRoutineMaintenance?.length > 0 ? (
+                    <div className="space-y-4">
+                      {filteredRoutineMaintenance.map((task: any) => (
+                        <Card key={task.id} className="hover:shadow-md transition-shadow">
+                          <CardHeader>
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <CardTitle className="flex items-center gap-2">
+                                  <Building className="h-5 w-5 text-blue-600" />
+                                  {task.facility}
+                                </CardTitle>
+                                <p className="text-gray-600 mt-1">{task.event}</p>
+                              </div>
+                              <Badge variant="outline" className="text-sm">
+                                Routine
+                              </Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <Calendar className="h-4 w-4" />
+                                  <span>Started: {format(new Date(task.eventDate), 'PPP')}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <Clock className="h-4 w-4" />
+                                  <span>Next Due: {calculateNextDueDate(task)}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <User className="h-4 w-4" />
+                                  <span>Created by: {task.requestor?.name || task.requestor?.id}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <Badge variant="secondary" className="text-xs">
+                                  Status: Active
+                                </Badge>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      No routine maintenance tasks found for {selectedBuilding}{selectedRoom ? ` - Room ${selectedRoom}` : ""}
               </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             )}
           </CardContent>
         </Card>

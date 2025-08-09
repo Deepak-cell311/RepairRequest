@@ -228,7 +228,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl shadow-xl p-8">
+            {/* <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl shadow-xl p-8">
               <h3 className="text-2xl font-bold text-gray-900 mb-6">Ready to Get Started?</h3>
               <p className="text-gray-600 mb-6">
                 Join organizations across industries already using RepairRequest to streamline their maintenance operations.
@@ -241,7 +241,7 @@ export default function Home() {
               <p className="text-sm text-gray-500 mt-4 text-center">
                 Contact your administrator for access credentials
               </p>
-            </div>
+            </div> */}
           </div>
         </div>
       </section>

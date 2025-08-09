@@ -132,7 +132,6 @@ export default function RoutineMaintenanceDetail() {
               <h1 className="text-2xl font-bold">Routine Maintenance Details</h1>
             {/* </Link> */}
           </div>
-          {/* <h1 className="text-2xl font-bold">Routine Maintenance Details</h1> */}
         </div>
         {(user?.role === 'admin' || user?.role === 'maintenance') && (
           <div className="flex gap-2">
