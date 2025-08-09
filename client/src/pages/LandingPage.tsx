@@ -15,6 +15,23 @@ export default function LandingPage() {
 
   const [content, setContent] = useState("");
 
+  useEffect(() => {
+    fetch("http://localhost:5001/embed-section") // FastAPI endpoint
+      .then(res => res.json())
+      .then(data => {
+        if (data.html) {
+          setContent(data.html);
+        }
+      });
+  }, []);
+
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://assets.calendly.com/assets/external/widget.js";
+    script.async = true;
+    document.body.appendChild(script);
+  }, [])
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -300,10 +317,10 @@ export default function LandingPage() {
       </section >
 
       {/* Benefits Section */}
-      < section className="py-20 bg-white" >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
+      < section className="py-20 bg-white " >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center justifu=y-center">
+            <div className="-mt-48">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
                 Built for Modern Property Management
               </h2>
@@ -343,7 +360,9 @@ export default function LandingPage() {
             </div> */}
             {/* <h1>Widget</h1> */}
             {/* <!-- Calendly inline widget begin --> */}
-            <div className="calendly-inline-widget" data-url="https://calendly.com/schoolhouselogistics/30min?hide_event_type_details=1&hide_gdpr_banner=1" style={{"minWidth":"320px", "height":"700px"}}></div>
+            <div className="calendly-inline-widget h-[40rem] -mt-20" data-url="https://calendly.com/schoolhouselogistics/30min?hide_event_type_details=1&hide_gdpr_banner=1" 
+            
+            ></div>
             
             {/* <!-- Calendly inline widget end --> */}
           </div>
