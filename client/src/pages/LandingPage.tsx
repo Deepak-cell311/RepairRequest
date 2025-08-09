@@ -16,7 +16,7 @@ export default function LandingPage() {
   const [content, setContent] = useState("");
 
   useEffect(() => {
-    fetch("http://localhost:5001/embed-section") // FastAPI endpoint
+    fetch(`${import.meta.env.VITE_API_URL}/embed-section`)
       .then(res => res.json())
       .then(data => {
         if (data.html) {
