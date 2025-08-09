@@ -248,11 +248,11 @@ export default function HeroLanding() {
                 Contact your administrator for access credentials
               </p>
             </div> */}
-              <div
-                className="calendly-inline-widget"
-                data-url="https://calendly.com/schoolhouselogistics/let-s-connect-30-min"
-                style={{ minWidth: "320px", height: "700px" }}
-              ></div>
+              {/* <!-- Calendly inline widget begin --> */}
+              <h1>Widget shows here</h1>
+              <div class="calendly-inline-widget" data-url="https://calendly.com/schoolhouselogistics/30min?hide_event_type_details=1&hide_gdpr_banner=1" style="min-width:320px;height:700px;"></div>
+              <script type="text/javascript" src="https://assets.calendly.com/assets/external/widget.js" async></script>
+              {/* <!-- Calendly inline widget end --> */}
             </div>
           </div>
         </section>

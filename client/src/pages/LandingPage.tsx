@@ -15,23 +15,6 @@ export default function LandingPage() {
 
   const [content, setContent] = useState("");
 
-  useEffect(() => {
-    fetch("http://localhost:5001/embed-section") // FastAPI endpoint
-      .then(res => res.json())
-      .then(data => {
-        if (data.html) {
-          setContent(data.html);
-        }
-      });
-  }, []);
-
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://assets.calendly.com/assets/external/widget.js";
-    script.async = true;
-    document.body.appendChild(script);
-  }, [])
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -358,7 +341,11 @@ export default function LandingPage() {
                 Contact your administrator for access credentials
               </p>
             </div> */}
-            <div dangerouslySetInnerHTML={{ __html: content }} />
+            {/* <h1>Widget</h1> */}
+            {/* <!-- Calendly inline widget begin --> */}
+            <div className="calendly-inline-widget" data-url="https://calendly.com/schoolhouselogistics/30min?hide_event_type_details=1&hide_gdpr_banner=1" style={{"minWidth":"320px", "height":"700px"}}></div>
+            
+            {/* <!-- Calendly inline widget end --> */}
           </div>
         </div>
       </section >
